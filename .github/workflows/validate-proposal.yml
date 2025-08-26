@@ -1,0 +1,26 @@
+name: validate-proposal
+on:
+  pull_request:
+    paths:
+      - 'proposals/**.json'
+      - 'schema/lean-research-schema.json'
+jobs:
+  jsonschema-validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.11' }
+      - run: |
+          python -m pip install --upgrade pip
+          pip install jsonschema
+          python - << 'PY'
+          import json, pathlib, sys
+          from jsonschema import Draft202012Validator
+          schema = json.loads(pathlib.Path('schema/lean-research-schema.json').read_text())
+          v = Draft202012Validator(schema)
+          for p in pathlib.Path('proposals').glob('*.json'):
+              data = json.loads(p.read_text())
+              v.validate(data)
+              print("Validated:", p)
+          PY
