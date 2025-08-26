@@ -1,0 +1,18 @@
+[flake8]
+max-line-length = 120
+exclude =
+    .git,
+    __pycache__,
+    .venv,
+    venv,
+    dist,
+    build,
+    htmlcov,
+    .pytest_cache,
+    .coverage
+extend-ignore = E203, W503
+per-file-ignores =
+    agent/prompts.py:E501
+    examples/*:E501
+    tests/*:E501
+    scripts/*:E501

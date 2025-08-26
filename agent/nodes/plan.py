@@ -5,8 +5,9 @@ Planning node for research workflow using MCP tools.
 from typing import Any, Dict
 
 from ..config import Config, get_logger
+from ..llm_client import LLMClient
 from ..prompts import ResearchPrompts
-from ..state import ResearchState
+from ..state import ResearchComponents, ResearchState
 from ..tools.mcp_client import MCPClient
 
 # Get logger for this node
@@ -17,8 +18,12 @@ def plan_node(state: ResearchState, config: Config) -> Dict[str, Any]:
     """Plan the research approach based on the idea."""
     logger.info("Starting planning node execution")
 
+    # Initialize LLM client for this node
+    llm_client = LLMClient(config, node_name="plan")
+    logger.debug("Initialized LLM client: %s", llm_client.get_provider_info())
+
     # Create node-specific MCP client to check available tools
-    mcp_client = MCPClient(config, node_name="plan")
+    mcp_client = MCPClient(config, llm_client, node_name="plan")
     available_tools = mcp_client.get_available_tool_names()
 
     logger.debug("Planning node has access to tools: %s", available_tools)
@@ -65,14 +70,49 @@ def plan_node(state: ResearchState, config: Config) -> Dict[str, Any]:
         logger.debug("Generating alpha-only research plan")
         plan = ResearchPrompts.ALPHA_ONLY_RESEARCH_PLAN_TEMPLATE.format(idea=modified_idea).strip()
     else:
-        logger.debug("Generating full research plan")
-        plan = ResearchPrompts.FULL_RESEARCH_PLAN_TEMPLATE.format(idea=modified_idea).strip()
+        # If specific components are provided in state, scope the plan accordingly
+        components_flag = state.get("components") or config.get_components_from_env()
+        if components_flag:
+            # Map IntFlag/int bitmask to list of component names safely
+            selected_components: list[str] = []
+            if isinstance(components_flag, (int, ResearchComponents)):
+                if components_flag & ResearchComponents.UNIVERSE:
+                    selected_components.append("UNIVERSE")
+                if components_flag & ResearchComponents.ALPHA:
+                    selected_components.append("ALPHA")
+                if components_flag & ResearchComponents.PORTFOLIO:
+                    selected_components.append("PORTFOLIO")
+                if components_flag & ResearchComponents.EXECUTION:
+                    selected_components.append("EXECUTION")
+                if components_flag & ResearchComponents.RISK:
+                    selected_components.append("RISK")
+
+            logger.debug("Generating component-scoped research plan for: %s", selected_components)
+            plan = ResearchPrompts.format_full_plan_for_components(idea=modified_idea, components=selected_components)
+        else:
+            logger.debug("Generating full research plan")
+            plan = ResearchPrompts.FULL_RESEARCH_PLAN_TEMPLATE.format(idea=modified_idea).strip()
 
     # Add iteration guidance and tool information to plan
     plan += iteration_note + tools_note
 
-    # Get search queries from prompts
-    search_queries = ResearchPrompts.get_search_queries(modified_idea, alpha_only)
+    # Get search queries from prompts (component-aware if available)
+    if "components_flag" in locals() and components_flag:
+        selected_components = []
+        if isinstance(components_flag, (int, ResearchComponents)):
+            if components_flag & ResearchComponents.UNIVERSE:
+                selected_components.append("UNIVERSE")
+            if components_flag & ResearchComponents.ALPHA:
+                selected_components.append("ALPHA")
+            if components_flag & ResearchComponents.PORTFOLIO:
+                selected_components.append("PORTFOLIO")
+            if components_flag & ResearchComponents.EXECUTION:
+                selected_components.append("EXECUTION")
+            if components_flag & ResearchComponents.RISK:
+                selected_components.append("RISK")
+        search_queries = ResearchPrompts.get_component_scoped_queries(modified_idea, selected_components, alpha_only)
+    else:
+        search_queries = ResearchPrompts.get_search_queries(modified_idea, alpha_only)
     logger.debug("Generated %d base search queries", len(search_queries))
 
     # Add variation to search queries for iterations
@@ -94,5 +134,7 @@ def plan_node(state: ResearchState, config: Config) -> Dict[str, Any]:
         "should_restart_planning": False,  # Reset restart flag
         "restart_reason": None,  # Clear restart reason
         "mcp_tools_available": available_tools,
+        # Persist component selection for downstream nodes
+        "components": components_flag if "components_flag" in locals() else state.get("components"),
         "current_step": "web_research",
     }

@@ -2,7 +2,9 @@
 
 ## Summary
 
-The research agent workflow has been enhanced with conditional restart logic that automatically restarts the planning phase when:
+The research agent workflow includes conditional restart logic that automatically restarts the planning phase when quality issues are detected. For overall architecture details, see [ARCHITECTURE_OVERVIEW.md](./ARCHITECTURE_OVERVIEW.md).
+
+## When Restarts Occur
 
 1. **Significant prior art is discovered** (3+ similar implementations)
 2. **Low viability scores are received** (<51/100 from criticism analysis)

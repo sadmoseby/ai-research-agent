@@ -55,12 +55,12 @@ class LLMClient:
             self.node_config = config.get_node_config(node_name)
         else:
             # Use default provider configuration
-            default_provider_config = config.get_provider_config(config.default_provider)
+            default_provider_config = config.default_config.llm_provider
             if not default_provider_config:
-                raise ValueError(f"Default provider '{config.default_provider}' not configured")
+                raise ValueError(f"Default provider '{config.default_config.llm_provider.provider}' not configured")
 
             self.node_config = {
-                "provider": config.default_provider,
+                "provider": config.default_config.llm_provider.provider,
                 "provider_config": default_provider_config,
                 "model": default_provider_config.model,
                 "temperature": default_provider_config.temperature,
@@ -74,16 +74,25 @@ class LLMClient:
         if provider in self._client_cache:
             return self._client_cache[provider]
 
-        provider_config = self.config.get_provider_config(provider)
-        if not provider_config:
-            raise ValueError(f"Provider '{provider}' not configured")
+        # Use node configuration values, not hardcoded provider defaults
+        if "provider_config" in self.node_config:
+            # Use the provider config from node configuration
+            provider_config = self.node_config["provider_config"]
+        else:
+            # Fallback to provider defaults if no node config available
+            provider_config = self.config.get_provider_config(provider)
+            if not provider_config:
+                raise ValueError(f"Provider '{provider}' not configured")
 
         # Get API key from environment
         api_key = None
-        if provider_config.api_key_env:
+        if provider_config.api_key_env and provider != "ollama":
             api_key = os.getenv(provider_config.api_key_env)
-            if not api_key and provider != "ollama":  # Ollama may not need API key
+            if not api_key:
                 raise ValueError(f"API key not found in environment variable '{provider_config.api_key_env}'")
+        elif provider_config.api_key_env and provider == "ollama":
+            # Ollama typically doesn't need an API key for local usage
+            api_key = os.getenv(provider_config.api_key_env)  # Optional for Ollama
 
         client = self._create_provider_client(provider_config, api_key)
         self._client_cache[provider] = client
@@ -251,7 +260,15 @@ Your response should be JSON only, no additional text or explanations.
 
         # Parse JSON response
         try:
-            return json.loads(response.content.strip())
+            content = response.content.strip()
+
+            # Strip markdown code blocks if present
+            if content.startswith("```json") and content.endswith("```"):
+                content = content[7:-3].strip()
+            elif content.startswith("```") and content.endswith("```"):
+                content = content[3:-3].strip()
+
+            return json.loads(content)
         except json.JSONDecodeError as e:
             raise ValueError(f"Failed to parse JSON response: {e}\nResponse: {response.content}")
 

@@ -7,8 +7,10 @@ import logging
 import logging.config
 import os
 import pathlib
-from dataclasses import dataclass, field
 from typing import Any, Dict, List, Literal, Optional
+
+from pydantic import Field, model_validator
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # Try to load dotenv, but don't fail if not available
 try:
@@ -24,9 +26,14 @@ SCHEMA_PATH = pathlib.Path("schema/lean-research-schema.jsonc")
 LLMProvider = Literal["openai", "anthropic", "gemini", "ollama"]
 
 
-@dataclass
-class LLMProviderConfig:
+class LLMProviderConfig(BaseSettings):
     """Configuration for an LLM provider."""
+
+    model_config = SettingsConfigDict(
+        env_prefix="",
+        case_sensitive=False,
+        extra="ignore",
+    )
 
     provider: LLMProvider
     api_key_env: str  # Environment variable name for API key
@@ -36,252 +43,196 @@ class LLMProviderConfig:
     max_tokens: int = 4000
 
     # Provider-specific settings
-    extra_kwargs: Dict[str, Any] = field(default_factory=dict)
+    extra_kwargs: Dict[str, Any] = Field(default_factory=dict)
 
 
-@dataclass
-class MCPClientConfig:
+class MCPClientConfig(BaseSettings):
     """Configuration for an individual MCP client/server."""
+
+    model_config = SettingsConfigDict(
+        env_prefix="",
+        case_sensitive=False,
+        extra="ignore",
+    )
 
     name: str  # Unique identifier for this MCP client
     server_type: str  # e.g., "web_search", "github", "tavily", "filesystem", "database"
-    enabled: bool = True
     # Connection details
     command: Optional[str] = None  # Command to start the MCP server
-    args: List[str] = field(default_factory=list)  # Arguments for the server command
-    env_vars: Dict[str, str] = field(default_factory=dict)  # Environment variables for the server
+    args: List[str] = Field(default_factory=list)  # Arguments for the server command
+    env_vars: Dict[str, str] = Field(default_factory=dict)  # Environment variables for the server
     # Configuration
     api_key_env: Optional[str] = None  # Environment variable name for API key
-    config_params: Dict[str, Any] = field(default_factory=dict)  # Additional configuration parameters
+    config_params: Dict[str, Any] = Field(default_factory=dict)  # Additional configuration parameters
+    # Status
+    enabled: bool = True  # Whether this MCP client is enabled
     # Timeouts and limits
     timeout: int = 30  # Connection timeout in seconds
     max_retries: int = 3
 
 
-@dataclass
-class NodeConfig:
+class NodeConfig(BaseSettings):
     """Configuration for a specific node."""
 
-    provider: Optional[str] = None  # Which LLM provider to use
-    model: Optional[str] = None
-    use_mcp: Optional[bool] = None
-    temperature: Optional[float] = None
-    max_tokens: Optional[int] = None
-    # MCP tools this node has access to (references to global MCP clients by name)
-    mcp_tools: List[str] = field(default_factory=list)
-    # Additional node-specific settings can be added here
+    model_config = SettingsConfigDict(
+        env_prefix="",
+        case_sensitive=False,
+        extra="ignore",
+    )
+
+    # Node-level settings
+    enabled: Optional[bool] = None  # Whether this node is enabled (None = use default True)
+
+    # Embedded LLM configuration
+    llm_provider: Optional[LLMProviderConfig] = None  # Node-specific LLM configuration
+
+    # MCP configuration
+    mcp_enabled: Optional[bool] = None  # Whether MCP is enabled for this node
+    mcp_tools: List[str] = Field(default_factory=list)  # Available tool names (for backward compatibility)
 
 
-@dataclass
-class LoggingConfig:
+class LoggingConfig(BaseSettings):
     """Configuration for logging."""
 
-    level: str = "INFO"
+    model_config = SettingsConfigDict(
+        env_prefix="LOG_",
+        case_sensitive=False,
+        extra="ignore",
+    )
+
+    level: str = Field(default="INFO", alias="LOG_LEVEL")
     format: str = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-    enable_node_logging: bool = True
-    enable_graph_logging: bool = True
-    log_to_file: bool = False
-    log_file_path: str = "research_agent.log"
+    enable_node_logging: bool = Field(default=True, alias="ENABLE_NODE_LOGGING")
+    enable_graph_logging: bool = Field(default=True, alias="ENABLE_GRAPH_LOGGING")
+    log_to_file: bool = Field(default=False, alias="LOG_TO_FILE")
+    log_file_path: str = Field(default="research_agent.log", alias="LOG_FILE_PATH")
     max_log_file_size: int = 10 * 1024 * 1024  # 10MB
     backup_count: int = 3
 
 
-@dataclass
-class Config:
-    """Configuration class for the research agent with global and per-node settings."""
+class Config(BaseSettings):
+    """Main configuration class for the research agent with global and per-node settings."""
 
-    # LLM Provider configurations
-    llm_providers: Dict[str, LLMProviderConfig] = field(default_factory=dict)
-    default_provider: str = "openai"
+    model_config = SettingsConfigDict(
+        env_prefix="",
+        env_nested_delimiter="__",
+        case_sensitive=False,
+        extra="ignore",
+    )
 
-    # Legacy OpenAI support (for backward compatibility)
-    openai_api_key: Optional[str] = None
+    # Core LLM settings
+    default_llm_provider: LLMProvider = Field(default="openai", alias="DEFAULT_LLM_PROVIDER")
+    model: str = Field(default="gpt-4o", alias="MODEL")
+    temperature: float = Field(default=0.7, alias="TEMPERATURE")
+    max_tokens: int = Field(default=4000, alias="MAX_TOKENS")
+    use_mcp: bool = Field(default=True, alias="USE_MCP")
 
-    # Other API keys
-    github_token: Optional[str] = None
-    tavily_api_key: Optional[str] = None
+    # API Keys
+    openai_api_key: Optional[str] = Field(default=None, alias="OPENAI_API_KEY")
+    anthropic_api_key: Optional[str] = Field(default=None, alias="ANTHROPIC_API_KEY")
+    google_api_key: Optional[str] = Field(default=None, alias="GOOGLE_API_KEY")
+    github_token: Optional[str] = Field(default=None, alias="GITHUB_TOKEN")
+    tavily_api_key: Optional[str] = Field(default=None, alias="TAVILY_API_KEY")
 
-    # Global defaults (will be applied to default provider)
-    model: str = "gpt-4o"
-    use_mcp: bool = True  # Enable MCP by default
-    temperature: float = 0.7
-    max_tokens: int = 4000
+    # Logging configuration (for initialization)
+    log_level: str = Field(default="INFO", alias="LOG_LEVEL")
+    enable_node_logging: bool = Field(default=True, alias="ENABLE_NODE_LOGGING")
+    enable_graph_logging: bool = Field(default=True, alias="ENABLE_GRAPH_LOGGING")
+    log_to_file: bool = Field(default=False, alias="LOG_TO_FILE")
+    log_file_path: str = Field(default="research_agent.log", alias="LOG_FILE_PATH")
 
-    # Logging configuration
-    logging: LoggingConfig = field(default_factory=LoggingConfig)
+    # Internal state - these are computed after initialization
+    mcp_clients: Dict[str, MCPClientConfig] = Field(default_factory=dict, exclude=True)
+    default_config: NodeConfig = Field(default_factory=NodeConfig, exclude=True)
+    node_configs: Dict[str, NodeConfig] = Field(default_factory=dict, exclude=True)
+    logging_config: LoggingConfig = Field(default_factory=LoggingConfig, exclude=True)
 
-    # Global MCP client configurations
-    mcp_clients: Dict[str, MCPClientConfig] = field(default_factory=dict)
-    # Per-node configurations
-    node_configs: Dict[str, NodeConfig] = field(default_factory=dict)
+    @model_validator(mode="after")
+    def initialize_internal_state(self) -> "Config":
+        """Initialize internal configuration state after pydantic validation."""
+        # Create default LLM provider config
+        default_llm_config = LLMProviderConfig(
+            provider=self.default_llm_provider,
+            api_key_env=f"{str(self.default_llm_provider).upper()}_API_KEY",
+            model=self.model,
+            temperature=self.temperature,
+            max_tokens=self.max_tokens,
+        )
+
+        # Initialize internal structures
+        self.default_config = NodeConfig(
+            enabled=True,
+            llm_provider=default_llm_config,
+            mcp_enabled=self.use_mcp,
+            mcp_tools=[],
+        )
+
+        # Initialize logging config from the main config attributes
+        self.logging_config = LoggingConfig(
+            level=self.log_level,
+            enable_node_logging=self.enable_node_logging,
+            enable_graph_logging=self.enable_graph_logging,
+            log_to_file=self.log_to_file,
+            log_file_path=self.log_file_path,
+        )
+
+        # Load global MCP client configurations
+        self._load_global_mcp_clients()
+        # Load per-node configurations
+        self._load_node_configs()
+
+        return self
 
     @classmethod
     def from_env(cls) -> "Config":
-        """Create config from environment variables."""
-        config = cls(
-            openai_api_key=os.getenv("OPENAI_API_KEY"),  # For backward compatibility
-            github_token=os.getenv("GITHUB_TOKEN"),
-            tavily_api_key=os.getenv("TAVILY_API_KEY"),
-            model=os.getenv("MODEL", "gpt-4o"),
-            default_provider=os.getenv("DEFAULT_LLM_PROVIDER", "openai"),
-            use_mcp=os.getenv("USE_MCP", "true").lower() == "true",
-            temperature=float(os.getenv("TEMPERATURE", "0.7")),
-            max_tokens=int(os.getenv("MAX_TOKENS", "4000")),
-        )
-
-        # Load LLM provider configurations
-        config._load_llm_providers()
-
-        # Validate that we have at least one working provider
-        if not config.llm_providers:
-            raise ValueError("No LLM providers configured. Please set at least one provider's API key.")
-
-        # Ensure default provider exists
-        if config.default_provider not in config.llm_providers:
-            # Fallback to first available provider
-            config.default_provider = list(config.llm_providers.keys())[0]
-            print(
-                f"Warning: Default provider '{config.default_provider}' not available. "
-                f"Using '{config.default_provider}'"
-            )
-
-        # Load global MCP client configurations
-        config._load_global_mcp_clients()
-        # Load per-node configurations
-        config._load_node_configs()
-        return config
-
-    def _load_llm_providers(self) -> None:
-        """Load LLM provider configurations from environment variables."""
-        # OpenAI
-        if os.getenv("OPENAI_API_KEY"):
-            self.llm_providers["openai"] = LLMProviderConfig(
-                provider="openai",
-                api_key_env="OPENAI_API_KEY",
-                model=os.getenv("OPENAI_MODEL", "gpt-4o"),
-                temperature=float(os.getenv("OPENAI_TEMPERATURE", str(self.temperature))),
-                max_tokens=int(os.getenv("OPENAI_MAX_TOKENS", str(self.max_tokens))),
-            )
-
-        # Anthropic
-        if os.getenv("ANTHROPIC_API_KEY"):
-            self.llm_providers["anthropic"] = LLMProviderConfig(
-                provider="anthropic",
-                api_key_env="ANTHROPIC_API_KEY",
-                model=os.getenv("ANTHROPIC_MODEL", "claude-3-5-sonnet-20241022"),
-                temperature=float(os.getenv("ANTHROPIC_TEMPERATURE", str(self.temperature))),
-                max_tokens=int(os.getenv("ANTHROPIC_MAX_TOKENS", str(self.max_tokens))),
-            )
-
-        # Google Gemini
-        if os.getenv("GOOGLE_API_KEY"):
-            self.llm_providers["gemini"] = LLMProviderConfig(
-                provider="gemini",
-                api_key_env="GOOGLE_API_KEY",
-                model=os.getenv("GEMINI_MODEL", "gemini-1.5-pro"),
-                temperature=float(os.getenv("GEMINI_TEMPERATURE", str(self.temperature))),
-                max_tokens=int(os.getenv("GEMINI_MAX_TOKENS", str(self.max_tokens))),
-            )
-
-        # Ollama (local)
-        ollama_base_url = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
-        if os.getenv("OLLAMA_MODEL") or os.getenv("ENABLE_OLLAMA", "false").lower() == "true":
-            self.llm_providers["ollama"] = LLMProviderConfig(
-                provider="ollama",
-                api_key_env="",  # Ollama typically doesn't need API key for local
-                model=os.getenv("OLLAMA_MODEL", "llama3.1"),
-                base_url=ollama_base_url,
-                temperature=float(os.getenv("OLLAMA_TEMPERATURE", str(self.temperature))),
-                max_tokens=int(os.getenv("OLLAMA_MAX_TOKENS", str(self.max_tokens))),
-            )
-
-        # Maintain backward compatibility
-        if self.openai_api_key and "openai" not in self.llm_providers:
-            self.llm_providers["openai"] = LLMProviderConfig(
-                provider="openai",
-                api_key_env="OPENAI_API_KEY",
-                model=self.model,
-                temperature=self.temperature,
-                max_tokens=self.max_tokens,
-            )
+        """Create config from environment variables (for backward compatibility)."""
+        return cls()
 
     def _load_global_mcp_clients(self) -> None:
         """Load global MCP client configurations."""
         # Initialize default MCP clients based on available API keys
-        if "openai" in self.llm_providers:
-            openai_config = self.llm_providers["openai"]
-            self.mcp_clients["web_search"] = MCPClientConfig(
-                name="web_search",
-                server_type="web_search",
-                command="npx",
-                args=["@modelcontextprotocol/server-web-search"],
-                api_key_env=openai_config.api_key_env,
-                config_params={"model": openai_config.model},
-            )
 
         if self.github_token:
             self.mcp_clients["github"] = MCPClientConfig(
                 name="github",
                 server_type="github",
-                command="npx",
-                args=["@modelcontextprotocol/server-github"],
+                command=os.getenv("MCP_GITHUB_COMMAND", "npx"),
+                args=os.getenv("MCP_GITHUB_ARGS", "@modelcontextprotocol/server-github").split(","),
                 api_key_env="GITHUB_TOKEN",
-                config_params={"repo_access": "public"},
+                config_params={"repo_access": os.getenv("MCP_GITHUB_REPO_ACCESS", "public")},
+                timeout=int(os.getenv("MCP_GITHUB_TIMEOUT", "30")),
+                max_retries=int(os.getenv("MCP_GITHUB_MAX_RETRIES", "3")),
             )
 
         if self.tavily_api_key:
             self.mcp_clients["tavily"] = MCPClientConfig(
                 name="tavily",
                 server_type="tavily",
-                command="npx",
-                args=["@modelcontextprotocol/server-tavily"],
+                command=os.getenv("MCP_TAVILY_COMMAND", "npx"),
+                args=os.getenv("MCP_TAVILY_ARGS", "@modelcontextprotocol/server-tavily").split(","),
                 api_key_env="TAVILY_API_KEY",
-                config_params={"search_depth": "advanced"},
+                config_params={"search_depth": os.getenv("MCP_TAVILY_SEARCH_DEPTH", "advanced")},
+                timeout=int(os.getenv("MCP_TAVILY_TIMEOUT", "30")),
+                max_retries=int(os.getenv("MCP_TAVILY_MAX_RETRIES", "3")),
             )
 
         # Always add filesystem client (no API key required)
+        allowed_dirs = os.getenv("MCP_FILESYSTEM_ALLOWED_DIRS", "/tmp,/workspace").split(",")
         self.mcp_clients["filesystem"] = MCPClientConfig(
             name="filesystem",
             server_type="filesystem",
-            command="npx",
-            args=["@modelcontextprotocol/server-filesystem"],
-            config_params={"allowed_directories": ["/tmp", "/workspace"]},
+            command=os.getenv("MCP_FILESYSTEM_COMMAND", "npx"),
+            args=os.getenv("MCP_FILESYSTEM_ARGS", "@modelcontextprotocol/server-filesystem").split(","),
+            config_params={"allowed_directories": [d.strip() for d in allowed_dirs]},
+            timeout=int(os.getenv("MCP_FILESYSTEM_TIMEOUT", "30")),
+            max_retries=int(os.getenv("MCP_FILESYSTEM_MAX_RETRIES", "3")),
         )
 
-        # Override with any environment-specific configurations
-        self._override_mcp_clients_from_env()
-
-    def _override_mcp_clients_from_env(self) -> None:
-        """Override MCP client configurations from environment variables."""
-        for client_name, client in self.mcp_clients.items():
-            env_prefix = f"MCP_{client_name.upper()}"
-
-            # Check for client-specific overrides
-            if os.getenv(f"{env_prefix}_ENABLED"):
-                client.enabled = os.getenv(f"{env_prefix}_ENABLED").lower() == "true"
-
-            if os.getenv(f"{env_prefix}_TIMEOUT"):
-                client.timeout = int(os.getenv(f"{env_prefix}_TIMEOUT"))
-
-            if os.getenv(f"{env_prefix}_MAX_RETRIES"):
-                client.max_retries = int(os.getenv(f"{env_prefix}_MAX_RETRIES"))
-
-            # Load additional config parameters
-            config_env = f"{env_prefix}_CONFIG"
-            if os.getenv(config_env):
-                try:
-                    additional_config = json.loads(os.getenv(config_env))
-                    client.config_params.update(additional_config)
-                except json.JSONDecodeError:
-                    print(f"Warning: Invalid JSON in {config_env}")
-
     def _load_node_configs(self) -> None:
-        """Load node-specific configurations from environment or config files."""
-        # Example: WEB_RESEARCH_MODEL, SYNTHESIZE_USE_MCP, etc.
+        """Load node-specific configurations from environment variables."""
         node_names = [
             "plan",
             "web_research",
-            "prior_art",
             "criticism",
             "synthesize",
             "validate",
@@ -289,217 +240,309 @@ class Config:
         ]
 
         for node_name in node_names:
-            node_config = NodeConfig()
-            env_prefix = node_name.upper()
-
-            # Check for node-specific environment variables
-            provider_env = f"{env_prefix}_PROVIDER"
-            if os.getenv(provider_env):
-                node_config.provider = os.getenv(provider_env)
-
-            model_env = f"{env_prefix}_MODEL"
-            if os.getenv(model_env):
-                node_config.model = os.getenv(model_env)
-
-            use_mcp_env = f"{env_prefix}_USE_MCP"
-            if os.getenv(use_mcp_env):
-                node_config.use_mcp = os.getenv(use_mcp_env).lower() == "true"
-
-            temperature_env = f"{env_prefix}_TEMPERATURE"
-            if os.getenv(temperature_env):
-                node_config.temperature = float(os.getenv(temperature_env))
-
-            max_tokens_env = f"{env_prefix}_MAX_TOKENS"
-            if os.getenv(max_tokens_env):
-                node_config.max_tokens = int(os.getenv(max_tokens_env))
-
-            # Load MCP tools this node has access to
-            node_config.mcp_tools = self._load_node_mcp_tools(node_name)
+            # Create node config from environment with proper prefix
+            node_config = self._create_node_config_from_env(node_name)
 
             # Only add if at least one setting is configured
-            if any(
-                [
-                    node_config.provider,
-                    node_config.model,
-                    node_config.use_mcp is not None,
-                    node_config.temperature is not None,
-                    node_config.max_tokens is not None,
-                    node_config.mcp_tools,
-                ]
-            ):
+            if self._has_node_config(node_config):
                 self.node_configs[node_name] = node_config
 
-    def _load_node_mcp_tools(self, node_name: str) -> List[str]:
-        """Load MCP tools available to a specific node from environment variables."""
+    def _create_node_config_from_env(self, node_name: str) -> NodeConfig:
+        """Create a node config from environment variables."""
+        # Create node config with environment-based loading
+        node_config = NodeConfig()
+
+        # Load LLM configuration for this node
+        node_llm_config = self._load_node_llm_config(node_name)
+        if node_llm_config:
+            node_config.llm_provider = node_llm_config
+
+        # Load MCP configuration for this node
+        mcp_tools_list = self._get_node_mcp_tools_list(node_name)
+        node_config.mcp_tools = mcp_tools_list
+
+        # Check for MCP enabled/disabled
+        mcp_enabled = self._get_node_mcp_enabled(node_name)
+        if mcp_enabled is not None:
+            node_config.mcp_enabled = mcp_enabled
+
+        # Check if node is enabled/disabled
+        enabled = self._get_node_enabled(node_name)
+        if enabled is not None:
+            node_config.enabled = enabled
+
+        return node_config
+
+    def _load_node_llm_config(self, node_name: str) -> Optional[LLMProviderConfig]:
+        """Load node-specific LLM configuration."""
         env_prefix = node_name.upper()
 
-        # Check for MCP tools configuration
-        # Format: {NODE}_MCP_TOOLS = "web_search,github,tavily"
-        tools_env = f"{env_prefix}_MCP_TOOLS"
-        tool_names = os.getenv(tools_env, "").split(",") if os.getenv(tools_env) else []
+        # Get node-specific values from environment
+        provider = os.getenv(f"{env_prefix}_LLM_PROVIDER")
+        model = os.getenv(f"{env_prefix}_LLM_MODEL")
+        temperature = os.getenv(f"{env_prefix}_LLM_TEMPERATURE")
+        max_tokens = os.getenv(f"{env_prefix}_LLM_MAX_TOKENS")
 
-        # Clean and validate tool names
-        valid_tools = []
-        for tool_name in tool_names:
-            tool_name = tool_name.strip()
-            if tool_name and tool_name in self.mcp_clients:
-                valid_tools.append(tool_name)
-            elif tool_name:  # Invalid tool name
-                print(f"Warning: MCP tool '{tool_name}' not found in global clients for node '{node_name}'")
+        # If no node-specific config, return None to use default
+        if not any([provider, model, temperature, max_tokens]):
+            return None
 
-        # If no specific tools configured, use defaults based on global settings
-        if not valid_tools and self.use_mcp:
-            # Default to all available MCP clients
-            valid_tools = list(self.mcp_clients.keys())
+        # Use provided values or fall back to main config values
+        effective_provider = provider or self.default_llm_provider
 
-        return valid_tools
+        result = LLMProviderConfig(
+            provider=effective_provider,
+            api_key_env=f"{effective_provider.upper()}_API_KEY",
+            model=model or self.model,
+            base_url=os.getenv(f"{env_prefix}_LLM_BASE_URL"),
+            temperature=float(temperature) if temperature else self.temperature,
+            max_tokens=int(max_tokens) if max_tokens else self.max_tokens,
+        )
+        return result
 
-    def get_node_config(self, node_name: str) -> Dict[str, Any]:
-        """Get effective configuration for a specific node (merging global and node-specific)."""
-        node_config = self.node_configs.get(node_name, NodeConfig())
+    def _get_node_mcp_tools_list(self, node_name: str) -> List[str]:
+        """Get MCP tools list for a specific node."""
+        env_prefix = node_name.upper()
+        tools_str = os.getenv(f"{env_prefix}_MCP_TOOLS")
+        if tools_str:
+            return [tool.strip() for tool in tools_str.split(",") if tool.strip()]
+        return []
 
-        # Determine effective provider
-        effective_provider = node_config.provider or self.default_provider
-        provider_config = self.llm_providers.get(effective_provider)
+    def _get_node_mcp_enabled(self, node_name: str) -> Optional[bool]:
+        """Get MCP enabled setting for a specific node."""
+        env_prefix = node_name.upper()
+        use_mcp_env = os.getenv(f"{env_prefix}_USE_MCP")
+        if use_mcp_env is not None:
+            return use_mcp_env.lower() == "true"
+        return None
 
-        if not provider_config:
-            raise ValueError(f"Provider '{effective_provider}' not configured for node '{node_name}'")
+    def _get_node_enabled(self, node_name: str) -> Optional[bool]:
+        """Get enabled setting for a specific node."""
+        env_prefix = node_name.upper()
+        enabled_env = os.getenv(f"{env_prefix}_ENABLED")
+        if enabled_env is not None:
+            return enabled_env.lower() == "true"
+        return None
 
-        # Get MCP clients that this node has access to
-        available_mcp_clients = []
-        for tool_name in node_config.mcp_tools:
-            if tool_name in self.mcp_clients:
-                available_mcp_clients.append(self.mcp_clients[tool_name])
+    def get_global_mcp_clients(self) -> Dict[str, MCPClientConfig]:
+        """Get all global MCP client configurations."""
+        return self.mcp_clients.copy()
 
-        return {
-            "provider": effective_provider,
-            "provider_config": provider_config,
-            "model": node_config.model or provider_config.model,
-            "use_mcp": (node_config.use_mcp if node_config.use_mcp is not None else self.use_mcp),
-            "temperature": (
-                node_config.temperature if node_config.temperature is not None else provider_config.temperature
-            ),
-            "max_tokens": (
-                node_config.max_tokens if node_config.max_tokens is not None else provider_config.max_tokens
-            ),
-            "mcp_tools": node_config.mcp_tools,  # Available tool names
-            "mcp_clients": available_mcp_clients,  # Actual client configurations
-            # Legacy keys for backward compatibility
-            "openai_api_key": self.openai_api_key,
-            "github_token": self.github_token,
-            "tavily_api_key": self.tavily_api_key,
-        }
+    def get_node_mcp_clients(self, node_name: str) -> List[MCPClientConfig]:
+        """Get MCP client configurations available to a specific node."""
+        node_tools = self.get_node_tools(node_name)
 
-    def set_node_config(self, node_name: str, **kwargs) -> None:
-        """Set configuration for a specific node."""
+        if node_tools is None:
+            # No restrictions, return all available clients
+            return list(self.mcp_clients.values())
+
+        # Return only the clients for tools this node has access to
+        return [self.mcp_clients[tool_name] for tool_name in node_tools if tool_name in self.mcp_clients]
+
+    def get_node_mcp_tools(self, node_name: str) -> List[str]:
+        """Get list of MCP tool names available to a specific node."""
+        node_tools = self.get_node_tools(node_name)
+
+        if node_tools is None:
+            # No restrictions, return all available tools
+            return list(self.mcp_clients.keys())
+
+        return node_tools
+
+    def add_global_mcp_client(self, client: MCPClientConfig) -> None:
+        """Add a new global MCP client configuration."""
+        self.mcp_clients[client.name] = client
+
+    def add_mcp_tool_to_node(self, node_name: str, tool_name: str) -> bool:
+        """Add MCP tool access to a specific node. Returns True if added, False if already present."""
+        if tool_name not in self.mcp_clients:
+            return False
+
+        # Get or create node config
         if node_name not in self.node_configs:
             self.node_configs[node_name] = NodeConfig()
 
         node_config = self.node_configs[node_name]
 
-        for key, value in kwargs.items():
-            if hasattr(node_config, key):
-                setattr(node_config, key, value)
-            else:
-                raise ValueError(f"Invalid node configuration key: {key}")
+        # Initialize mcp_tools if not set
+        if not hasattr(node_config, "mcp_tools") or node_config.mcp_tools is None:
+            node_config.mcp_tools = []
 
-    def add_mcp_tool_to_node(self, node_name: str, tool_name: str) -> bool:
-        """Add an MCP tool to a specific node. Returns True if added, False if tool doesn't exist."""
-        if tool_name not in self.mcp_clients:
-            return False
+        # Add tool if not already present
+        if tool_name not in node_config.mcp_tools:
+            node_config.mcp_tools.append(tool_name)
+            return True
 
-        if node_name not in self.node_configs:
-            self.node_configs[node_name] = NodeConfig()
-
-        if tool_name not in self.node_configs[node_name].mcp_tools:
-            self.node_configs[node_name].mcp_tools.append(tool_name)
-
-        return True
+        return False
 
     def remove_mcp_tool_from_node(self, node_name: str, tool_name: str) -> bool:
-        """Remove an MCP tool from a specific node. Returns True if removed, False if not found."""
+        """Remove MCP tool access from a specific node. Returns True if removed, False if not present."""
         if node_name not in self.node_configs:
             return False
 
-        if tool_name in self.node_configs[node_name].mcp_tools:
-            self.node_configs[node_name].mcp_tools.remove(tool_name)
+        node_config = self.node_configs[node_name]
+
+        if not hasattr(node_config, "mcp_tools") or not node_config.mcp_tools:
+            return False
+
+        if tool_name in node_config.mcp_tools:
+            node_config.mcp_tools.remove(tool_name)
             return True
 
         return False
 
-    def get_node_mcp_tools(self, node_name: str) -> List[str]:
-        """Get all MCP tool names available to a specific node."""
-        node_config = self.node_configs.get(node_name, NodeConfig())
-        return node_config.mcp_tools.copy()  # Return a copy to prevent external modification
+    def _has_node_config(self, node_config: NodeConfig) -> bool:
+        """Check if node config has any non-default values."""
+        return any(
+            [
+                node_config.llm_provider is not None,
+                node_config.mcp_tools,
+                node_config.enabled is not None,
+                node_config.mcp_enabled is not None,
+            ]
+        )
 
-    def get_provider_config(self, provider_name: str) -> Optional[LLMProviderConfig]:
-        """Get configuration for a specific LLM provider."""
-        return self.llm_providers.get(provider_name)
+    def get_node_config(self, node_name: str) -> Dict[str, Any]:
+        """Get effective configuration for a specific node (merging global and node-specific)."""
+        node_config = self.node_configs.get(node_name, NodeConfig())
+
+        # Determine effective LLM configuration
+        if node_config.llm_provider:
+            provider_config = node_config.llm_provider
+        else:
+            provider_config = self.default_config.llm_provider
+
+        # Determine effective MCP configuration
+        mcp_tools = self.get_node_tools(node_name) or []
+        available_mcp_clients = []
+
+        for tool_name in mcp_tools:
+            if tool_name in self.mcp_clients:
+                available_mcp_clients.append(self.mcp_clients[tool_name])
+
+        mcp_enabled = (
+            node_config.mcp_enabled if node_config.mcp_enabled is not None else self.default_config.mcp_enabled
+        )
+
+        return {
+            "provider": provider_config.provider,
+            "provider_config": provider_config,
+            "model": provider_config.model,
+            "use_mcp": mcp_enabled,
+            "mcp_enabled": mcp_enabled,
+            "temperature": provider_config.temperature,
+            "max_tokens": provider_config.max_tokens,
+            "mcp_tools": mcp_tools,
+            "mcp_clients": available_mcp_clients,
+            "node_mcp_clients": {},
+        }
 
     def get_available_providers(self) -> List[str]:
-        """Get list of available LLM providers."""
-        return list(self.llm_providers.keys())
+        """Get list of available LLM providers based on API keys."""
+        providers = []
+        if os.getenv("OPENAI_API_KEY"):
+            providers.append("openai")
+        if os.getenv("ANTHROPIC_API_KEY"):
+            providers.append("anthropic")
+        if os.getenv("GOOGLE_API_KEY"):
+            providers.append("gemini")
+        if os.getenv("OLLAMA_MODEL") or os.getenv("ENABLE_OLLAMA", "false").lower() == "true":
+            providers.append("ollama")
+        return providers
 
-    def set_node_provider(self, node_name: str, provider: str) -> bool:
-        """Set the LLM provider for a specific node. Returns True if successful."""
-        if provider not in self.llm_providers:
-            return False
+    def get_node_tools(self, node_name: str) -> Optional[List[str]]:
+        """Get the list of tools available to a specific node."""
+        # Check if node has specific tool configuration
+        if node_name in self.node_configs:
+            node_config = self.node_configs[node_name]
+            if hasattr(node_config, "mcp_tools") and node_config.mcp_tools:
+                return node_config.mcp_tools
 
-        if node_name not in self.node_configs:
-            self.node_configs[node_name] = NodeConfig()
+        # Check default configuration
+        if hasattr(self.default_config, "mcp_tools") and self.default_config.mcp_tools:
+            return self.default_config.mcp_tools
 
-        self.node_configs[node_name].provider = provider
-        return True
+        # Return None to indicate no specific tool restrictions (all tools allowed)
+        return None
 
-    def get_node_mcp_clients(self, node_name: str) -> List[MCPClientConfig]:
-        """Get all MCP client configurations available to a specific node."""
-        node_config = self.node_configs.get(node_name, NodeConfig())
-        clients = []
-        for tool_name in node_config.mcp_tools:
-            if tool_name in self.mcp_clients:
-                clients.append(self.mcp_clients[tool_name])
-        return clients
+    def get_provider_config(self, provider: str) -> Optional[LLMProviderConfig]:
+        """Get LLM provider configuration for the specified provider."""
+        provider_configs = {
+            "openai": LLMProviderConfig(
+                provider="openai",
+                api_key_env="OPENAI_API_KEY",
+                model=os.getenv("OPENAI_MODEL", "gpt-4o"),
+                temperature=float(os.getenv("OPENAI_TEMPERATURE", "0.1")),
+                max_tokens=int(os.getenv("OPENAI_MAX_TOKENS", "4000")),
+            ),
+            "anthropic": LLMProviderConfig(
+                provider="anthropic",
+                api_key_env="ANTHROPIC_API_KEY",
+                model=os.getenv("ANTHROPIC_MODEL", "claude-3-5-sonnet-20241022"),
+                temperature=float(os.getenv("ANTHROPIC_TEMPERATURE", "0.1")),
+                max_tokens=int(os.getenv("ANTHROPIC_MAX_TOKENS", "4000")),
+            ),
+            "gemini": LLMProviderConfig(
+                provider="gemini",
+                api_key_env="GOOGLE_API_KEY",
+                model=os.getenv("GOOGLE_MODEL", "gemini-1.5-pro"),
+                temperature=float(os.getenv("GOOGLE_TEMPERATURE", "0.1")),
+                max_tokens=int(os.getenv("GOOGLE_MAX_TOKENS", "4000")),
+            ),
+            "ollama": LLMProviderConfig(
+                provider="ollama",
+                api_key_env="OLLAMA_API_KEY",  # Placeholder, not actually used
+                model=os.getenv("OLLAMA_MODEL", "llama3.2:3b"),
+                temperature=float(os.getenv("OLLAMA_TEMPERATURE", "0.1")),
+                max_tokens=int(os.getenv("OLLAMA_MAX_TOKENS", "4000")),
+            ),
+        }
 
-    def add_global_mcp_client(self, client: MCPClientConfig) -> None:
-        """Add a global MCP client configuration."""
-        self.mcp_clients[client.name] = client
+        return provider_configs.get(provider)
 
-    def remove_global_mcp_client(self, client_name: str) -> bool:
-        """Remove a global MCP client configuration. Returns True if removed, False if not found."""
-        if client_name in self.mcp_clients:
-            del self.mcp_clients[client_name]
+    def get_effective_config_summary(self) -> Dict[str, Any]:
+        """Get a summary of the effective configuration for all nodes."""
+        summary = {
+            "global": {
+                "default_provider": self.default_config.llm_provider.provider,
+                "available_providers": self.get_available_providers(),
+                "global_mcp_clients": list(self.mcp_clients.keys()),
+                "use_mcp": self.default_config.mcp_enabled,
+            },
+            "nodes": {},
+        }
 
-            # Remove from all nodes that use this client
-            for node_config in self.node_configs.values():
-                if client_name in node_config.mcp_tools:
-                    node_config.mcp_tools.remove(client_name)
+        for node_name in ["plan", "web_research", "criticism", "synthesize", "validate", "persist"]:
+            try:
+                node_config = self.get_node_config(node_name)
+                summary["nodes"][node_name] = {
+                    "provider": node_config["provider"],
+                    "model": node_config["model"],
+                    "mcp_enabled": node_config["mcp_enabled"],
+                    "mcp_tools": node_config["mcp_tools"],
+                    "temperature": node_config["temperature"],
+                    "max_tokens": node_config["max_tokens"],
+                }
+            except (KeyError, AttributeError, TypeError) as e:
+                summary["nodes"][node_name] = {"error": str(e)}
 
-            return True
-        return False
-
-    def get_global_mcp_clients(self) -> Dict[str, MCPClientConfig]:
-        """Get all global MCP client configurations."""
-        return self.mcp_clients.copy()  # Return a copy to prevent external modification
+        return summary
 
     def for_node(self, node_name: str) -> "Config":
-        """Create a new Config instance with node-specific settings applied as defaults.
-
-        This allows backward compatibility while providing node-specific configuration.
-        """
-        node_config = self.get_node_config(node_name)
+        """Create a new Config instance with node-specific settings applied as defaults."""
+        node_config_dict = self.get_node_config(node_name)
 
         # Create a new config instance with node-specific values
-        new_config = Config(
-            openai_api_key=self.openai_api_key,
-            github_token=self.github_token,
-            tavily_api_key=self.tavily_api_key,
-            model=node_config["model"],
-            use_mcp=node_config["use_mcp"],
-            temperature=node_config["temperature"],
-            max_tokens=node_config["max_tokens"],
-            mcp_clients=self.mcp_clients.copy(),  # Keep all global MCP clients
-            node_configs=self.node_configs,  # Keep the node configs for potential nested calls
+        new_config = Config()
+        new_config.mcp_clients = self.mcp_clients.copy()
+        new_config.default_config = NodeConfig(
+            enabled=True,
+            llm_provider=node_config_dict["provider_config"],
+            mcp_enabled=node_config_dict["mcp_enabled"],
+            mcp_tools=node_config_dict["mcp_tools"],
         )
+        new_config.node_configs = self.node_configs
+        new_config.logging_config = self.logging_config
 
         return new_config
 
@@ -508,12 +551,58 @@ class Config:
         return [
             "plan",
             "web_research",
-            "prior_art",
             "criticism",
             "synthesize",
-            "validate",
             "persist",
         ]
+
+    # --- Components helpers ---
+    def get_components_from_env(self) -> Optional[int]:
+        """Parse COMPONENTS env var into a ResearchComponents bitmask.
+
+        Examples:
+          COMPONENTS="UNIVERSE,ALPHA" -> UNIVERSE | ALPHA
+        """
+        raw = os.getenv("COMPONENTS")
+        if not raw:
+            return None
+
+        # Import here to avoid any potential circular import at module load time
+        try:
+            from .state import ResearchComponents
+        except ImportError:
+            return None
+
+        mapping = {
+            "UNIVERSE": ResearchComponents.UNIVERSE,
+            "ALPHA": ResearchComponents.ALPHA,
+            "PORTFOLIO": ResearchComponents.PORTFOLIO,
+            "EXECUTION": ResearchComponents.EXECUTION,
+            "RISK": ResearchComponents.RISK,
+        }
+
+        bitmask = 0
+        for part in raw.split(","):
+            key = part.strip().upper()
+            if key in mapping:
+                bitmask |= int(mapping[key])
+
+        return bitmask or None
+
+    def is_node_enabled(self, node_name: str) -> bool:
+        """Check if a node is enabled. Returns True by default if not explicitly disabled."""
+        node_config = self.node_configs.get(node_name)
+        if node_config and node_config.enabled is not None:
+            return node_config.enabled
+        return True  # Default to enabled
+
+    def get_enabled_nodes(self) -> list[str]:
+        """Get list of all enabled node names."""
+        return [node for node in self.get_all_node_names() if self.is_node_enabled(node)]
+
+    def get_disabled_nodes(self) -> list[str]:
+        """Get list of all disabled node names."""
+        return [node for node in self.get_all_node_names() if not self.is_node_enabled(node)]
 
     def get_schema(self) -> dict:
         """Load and return the JSON schema, handling JSONC format."""
@@ -529,9 +618,14 @@ class Config:
         clean_json = "\n".join(lines)
         return json.loads(clean_json)
 
+    def get_boolean_env(self, env_var: str, default: bool = False) -> bool:
+        """Get a boolean environment variable with proper parsing."""
+        value = os.environ.get(env_var, str(default)).lower()
+        return value in ("true", "1", "yes", "on")
+
     def setup_logging(self):
         """Setup logging configuration based on the logging config."""
-        log_config = self.logging
+        log_config = self.logging_config
 
         # Configure the root logger
         logging.basicConfig(
@@ -564,7 +658,7 @@ class Config:
             node_names = self.get_all_node_names()
             for node_name in node_names:
                 node_logger = logging.getLogger(f"research_agent.nodes.{node_name}")
-                node_logger.info(f"Node logger initialized for {node_name}")
+                node_logger.info("Node logger initialized for %s", node_name)
 
 
 def get_logger(name: str) -> logging.Logger:

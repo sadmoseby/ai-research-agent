@@ -28,6 +28,14 @@ def create_slug(idea_text: str) -> str:
 async def propose_command(args):
     """Execute the propose command."""
     try:
+        # Enable component-by-component synthesis by default, unless unified is requested
+        import os
+
+        if args.unified_synthesis:
+            os.environ["SYNTHESIZE_COMPONENT_BY_COMPONENT"] = "false"
+        elif "SYNTHESIZE_COMPONENT_BY_COMPONENT" not in os.environ:
+            os.environ["SYNTHESIZE_COMPONENT_BY_COMPONENT"] = "true"
+
         config = Config.from_env()
 
         # Setup logging
@@ -50,8 +58,18 @@ async def propose_command(args):
         print(f"🔬 Starting research for: {args.idea}")
         print(f"📁 Will write to: proposals/{slug}.json")
 
+        # Show synthesis mode
+        synthesis_mode = (
+            "component-by-component"
+            if os.environ.get("SYNTHESIZE_COMPONENT_BY_COMPONENT", "false").lower() == "true"
+            else "unified"
+        )
+        print(f"⚙️  Synthesis mode: {synthesis_mode}")
+        if args.alpha_only:
+            print("🎯 Alpha-only mode: will use unified synthesis regardless of setting")
+
         # Run the graph
-        final_state = await graph.ainvoke(initial_state)
+        final_state = await graph.ainvoke(initial_state, config={"configurable": {"thread_id": slug}})
 
         # Show restart information if applicable
         planning_iteration = final_state.get("planning_iteration", 0)
@@ -63,6 +81,8 @@ async def propose_command(args):
             sys.exit(1)
         elif final_state.get("proposal_path"):
             print(f"✅ Proposal written to: {final_state['proposal_path']}")
+            if final_state.get("state_path"):
+                print(f"📊 Final state written to: {final_state['state_path']}")
             if final_state.get("validation_report"):
                 print(f"📋 Validation: {final_state['validation_report']}")
         else:
@@ -83,6 +103,11 @@ def main():
     propose_parser.add_argument("--idea", required=True, help="Research idea (free text)")
     propose_parser.add_argument("--alpha-only", action="store_true", help="Generate alpha-only proposal")
     propose_parser.add_argument("--slug", help="Custom slug for output filename")
+    propose_parser.add_argument(
+        "--unified-synthesis",
+        action="store_true",
+        help="Use unified synthesis instead of component-by-component (default: component-by-component)",
+    )
 
     args = parser.parse_args()
 

@@ -1,10 +1,10 @@
-# Prompt Organization for Research Agent
-
-This document explains how prompts have been organized in the research agent for better maintainability and modification.
+# Prompt Organization
 
 ## Overview
 
-All prompts have been moved from individual node files to a centralized `agent/prompts.py` file. This makes it easy to:
+All prompts are centralized in `agent/prompts.py` for better maintainability and modification. For configuration details, see [CONFIGURATION_GUIDE.md](./CONFIGURATION_GUIDE.md).
+
+## Benefits of Centralization
 
 - Find and modify all prompts in one place
 - Maintain consistency across different nodes

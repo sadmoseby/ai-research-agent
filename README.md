@@ -125,6 +125,7 @@ state = ResearchState(
 # Run research
 result = await graph.ainvoke(state)
 print(f"Proposal saved to: {result['proposal_path']}")
+print(f"Workflow state saved to: {result['state_path']}")
 ```
 
 ## Workflow
@@ -136,7 +137,7 @@ The agent follows a structured research workflow:
 3. **🔍 Prior Art Check**: Searches GitHub for similar implementations
 4. **⚗️ Synthesis**: Generates structured proposal using OpenAI with schema validation
 5. **✅ Validation**: Validates against JSON schema with automatic repair attempts
-6. **💾 Persistence**: Saves final proposal to `proposals/` directory
+6. **💾 Persistence**: Saves both the final proposal and complete workflow state to `proposals/` directory
 
 ## Output Format
 

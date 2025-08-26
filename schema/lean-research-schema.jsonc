@@ -30,37 +30,21 @@
     "propertyNames": { "enum": ["alphas", "universe", "alpha-only"] },
     "required": ["alphas", "universe"],
     // In alpha-only mode:
-    // - alphas: exactly one item, and it must be in either 'new' or 'amend' (NOT 'existing')
-    // - universe: exactly one item, and it must be in 'existing' only
+    // - alphas: exactly one item, and it must be in 'new'
+    // - universe: exactly one item, and it must be in 'new'
     "properties": {
       "alphas": {
         "type": "object",
-        "anyOf": [
-          {
-            "required": ["new"],
-            "properties": {
-              "new": { "type": "array", "minItems": 1, "maxItems": 1 },
-              "amend": { "type": "array", "maxItems": 0 },
-              "existing": { "type": "array", "maxItems": 0 }
-            }
-          },
-          {
-            "required": ["amend"],
-            "properties": {
-              "amend": { "type": "array", "minItems": 1, "maxItems": 1 },
-              "new": { "type": "array", "maxItems": 0 },
-              "existing": { "type": "array", "maxItems": 0 }
-            }
-          }
-        ]
+        "required": ["new"],
+        "properties": {
+          "new": { "type": "array", "minItems": 1, "maxItems": 1 }
+        }
       },
       "universe": {
         "type": "object",
-        "required": ["existing"],
+        "required": ["new"],
         "properties": {
-          "existing": { "type": "array", "minItems": 1, "maxItems": 1 },
-          "new": { "type": "array", "maxItems": 0 },
-          "amend": { "type": "array", "maxItems": 0 }
+          "new": { "type": "array", "minItems": 1, "maxItems": 1 }
         }
       }
     }
@@ -71,9 +55,7 @@
       "alphas": {
         "type": "object",
         "properties": {
-          "existing": { "type": "array" },
-          "new": { "type": "array", "maxItems": 0 },
-          "amend": { "type": "array", "maxItems": 0 }
+          "new": { "type": "array" }
         }
       }
     }
@@ -83,33 +65,11 @@
       "type": "object",
       "additionalProperties": true,
       "properties": {
-        "new":      { "$ref": "#/$defs/componentNewArray" },
-        "existing": { "$ref": "#/$defs/componentArray"    },
-        "amend":    { "$ref": "#/$defs/componentArray"    }
+        "new": { "$ref": "#/$defs/componentNewArray" }
       }
     },
 
     "componentNewArray": { "type": "array", "items": { "$ref": "#/$defs/componentNew" } },
-    "componentArray":    { "type": "array", "items": { "$ref": "#/$defs/component"    } },
-
-    "component": {
-      "type": "object",
-      "required": ["name", "location"],
-      "additionalProperties": true,
-      "properties": {
-        "name":        { "type": "string" },
-        "location":    { "type": "string",
-                        "enum": ["stdlib", "local"],
-                        "description": "Resolution site" },
-        "componentId": { "type": "string", "description": "Stable cross-file URI" },
-        "version":     { "type": "string", "description": "Optional semantic version" },
-        "title":       { "type": "string" },
-        "description": { "type": "string" },
-        "text":        { "type": "string",
-                        "description": "Free-form text for new/amend items" },
-        "params":      { "$ref": "#/$defs/paramArray" }
-      }
-    },
 
     "componentNew": {
       "type": "object",
@@ -145,11 +105,11 @@
         "enumValues": { "type":"array","items":{"type":"string"} },
 
         "minimum": {
-          "type": ["int","float","datetime"],
+          "type": ["integer","number","string"],
           "description": "Optuna lower bound for the parameter."
         },
         "maximum": {
-          "type": ["int","float","datetime"],
+          "type": ["integer","number","string"],
           "description": "Optuna upper bound for the parameter."
         },
 
@@ -162,10 +122,7 @@
               "description": "Distribution type for Optuna parameter sampling"
             },
             "step": {
-              "oneOf": [
-                { "type": "integer" },
-                { "type": "number" }
-              ],
+              "type": "number",
               "description": "Step size when using step distribution"
             }
           },

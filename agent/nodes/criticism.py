@@ -5,6 +5,7 @@ Criticism node for evaluating research proposals using MCP (Model Context Protoc
 from typing import Any, Dict
 
 from ..config import Config, get_logger
+from ..llm_client import LLMClient
 from ..prompts import ResearchPrompts
 from ..state import ResearchState
 from ..tools.mcp_client import MCPClient, MCPToolError
@@ -16,50 +17,57 @@ logger = get_logger("nodes.criticism")
 async def _generate_criticism_analysis(
     idea: str,
     research_context: str,
-    prior_art_summary: str,
-    config: Config,
+    llm_client: LLMClient,
     available_tools: list,
+    use_component_specific: bool = False,
 ) -> str:
-    """Generate criticism analysis using OpenAI via the config."""
-    logger.debug("Generating criticism analysis using OpenAI")
-    from openai import AsyncOpenAI
-
-    client = AsyncOpenAI(api_key=config.openai_api_key)
+    """Generate criticism analysis using the LLM client."""
+    logger.debug("Generating criticism analysis using LLM client (component-specific: %s)", use_component_specific)
 
     # Format available tools for the LLM
     tools_formatted = ResearchPrompts.format_available_tools(available_tools)
     logger.debug("Formatted %d tools for LLM context", len(available_tools))
 
-    system_prompt = ResearchPrompts.CRITICISM_SYSTEM_PROMPT.format(available_tools=tools_formatted)
-    user_prompt = ResearchPrompts.CRITICISM_USER_PROMPT.format(
-        idea=idea,
-        research_context=research_context,
-        prior_art_summary=prior_art_summary,
-    )
+    # Choose appropriate prompts based on whether we have component-specific research
+    if use_component_specific:
+        system_prompt = ResearchPrompts.COMPONENT_CRITICISM_SYSTEM_PROMPT.format(available_tools=tools_formatted)
+        user_prompt = ResearchPrompts.COMPONENT_CRITICISM_USER_PROMPT.format(
+            idea=idea,
+            component_research_context=research_context,
+        )
+    else:
+        system_prompt = ResearchPrompts.CRITICISM_SYSTEM_PROMPT.format(available_tools=tools_formatted)
+        user_prompt = ResearchPrompts.CRITICISM_USER_PROMPT.format(
+            idea=idea,
+            research_context=research_context,
+        )
 
     try:
-        response = await client.chat.completions.create(
-            model=config.model,
-            messages=[
+        response = await llm_client.chat_completion(
+            [
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt},
             ],
             temperature=0.7,
-            max_tokens=1500,
+            max_tokens=2500,  # Increased for component-specific analysis
         )
 
-        return response.choices[0].message.content
+        return response
 
     except Exception as e:
-        raise MCPToolError(f"Criticism analysis failed: {str(e)}")
+        raise MCPToolError(f"Criticism analysis failed: {str(e)}") from e
 
 
 async def criticism_node(state: ResearchState, config: Config) -> Dict[str, Any]:
     """Critically evaluate the research proposal concept using MCP."""
     logger.info("Starting criticism node execution")
 
+    # Initialize LLM client for this node
+    llm_client = LLMClient(config, node_name="criticism")
+    logger.debug("Initialized LLM client: %s", llm_client.get_provider_info())
+
     # Create node-specific MCP client
-    mcp_client = MCPClient(config, node_name="criticism")
+    mcp_client = MCPClient(config, llm_client, node_name="criticism")
     available_tools = mcp_client.get_available_tool_names()
 
     logger.debug("Criticism node has access to tools: %s", available_tools)
@@ -68,32 +76,65 @@ async def criticism_node(state: ResearchState, config: Config) -> Dict[str, Any]
     # Get context from previous steps
     idea = state["idea"]
     research_plan = state.get("research_plan", "")
+    # Include component scope note if available
+    components_flag = state.get("components") or config.get_components_from_env()
+    component_names = []
+    try:
+        from ..state import ResearchComponents as _RC
+
+        if components_flag and isinstance(components_flag, (int, _RC)):
+            if components_flag & _RC.UNIVERSE:
+                component_names.append("UNIVERSE")
+            if components_flag & _RC.ALPHA:
+                component_names.append("ALPHA")
+            if components_flag & _RC.PORTFOLIO:
+                component_names.append("PORTFOLIO")
+            if components_flag & _RC.EXECUTION:
+                component_names.append("EXECUTION")
+            if components_flag & _RC.RISK:
+                component_names.append("RISK")
+    except (AttributeError, TypeError, ImportError):
+        pass
+    if component_names:
+        research_plan = research_plan + f"\n\nComponent Scope: {', '.join(component_names)}\n"
+
     web_results = state.get("web_search_results", [])
-    prior_art_results = state.get("prior_art_results", {})
+    component_research_results = state.get("component_research_results", {})
 
     logger.info(
-        "Analyzing research proposal: idea_length=%d, web_results=%d, prior_art_found=%d",
+        "Analyzing research proposal: idea_length=%d, web_results=%d, component_results=%d",
         len(idea),
         len(web_results),
-        prior_art_results.get("total_found", 0),
+        len(component_research_results),
     )
+
+    # Determine if we should use component-specific criticism
+    use_component_specific = bool(component_research_results)
 
     # Format context for criticism using prompts
-    research_context = ResearchPrompts.format_criticism_context(
-        research_plan=research_plan, web_results=web_results, idea=idea
-    )
-
-    prior_art_summary = ResearchPrompts.format_prior_art_summary(prior_art_results)
+    if use_component_specific:
+        logger.info("Using component-specific criticism analysis")
+        research_context = ResearchPrompts.format_component_criticism_context(
+            research_plan=research_plan,
+            component_research_results=component_research_results,
+            web_results=web_results,
+            idea=idea,
+        )
+    else:
+        logger.info("Using general criticism analysis")
+        research_context = ResearchPrompts.format_criticism_context(
+            research_plan=research_plan, web_results=web_results, idea=idea
+        )
 
     try:
         logger.debug("Generating criticism analysis")
-        # Generate criticism analysis with tool awareness
+        # Generate criticism analysis with tool awareness and component-specific handling
         criticism_text = await _generate_criticism_analysis(
             idea=idea,
             research_context=research_context,
-            prior_art_summary=prior_art_summary,
-            config=config,
+            llm_client=llm_client,
             available_tools=available_tools,
+            use_component_specific=use_component_specific,
         )
 
         # If the LLM needs additional research during criticism, it can use MCP tools
@@ -103,16 +144,24 @@ async def criticism_node(state: ResearchState, config: Config) -> Dict[str, Any]
         # Extract viability score from the criticism text
         viability_score = ResearchPrompts.extract_viability_score(criticism_text)
 
+        # Extract component scores if using component-specific analysis
+        component_scores = {}
+        if use_component_specific:
+            component_scores = ResearchPrompts.extract_component_scores(criticism_text)
+            logger.info("Extracted component scores: %s", component_scores)
+
         # Structure the criticism results
         criticism_results = {
             "criticism_text": criticism_text,
             "idea": idea,
             "viability_score": viability_score,
+            "component_scores": component_scores,  # New field for component-specific scores
             "research_quality": "analyzed",
             "risk_factors_identified": True,
             "recommendations_provided": True,
-            "analysis_method": "mcp_criticism",
+            "analysis_method": "mcp_component_criticism" if use_component_specific else "mcp_criticism",
             "mcp_tools_available": available_tools,
+            "components_analyzed": list(component_research_results.keys()) if use_component_specific else [],
         }
 
         # Check if we should restart planning due to low score
@@ -166,11 +215,13 @@ Recommendation: Proceed with caution and conduct thorough testing.
             "criticism_text": fallback_criticism,
             "idea": idea,
             "viability_score": 50.0,  # Neutral score for fallback
+            "component_scores": {},  # Empty for fallback
             "research_quality": "limited",
             "risk_factors_identified": False,
             "recommendations_provided": True,
             "analysis_method": "fallback",
             "error": error_msg,
+            "components_analyzed": [],
         }
 
         return {
@@ -180,7 +231,7 @@ Recommendation: Proceed with caution and conduct thorough testing.
             "current_step": "synthesize",
         }
 
-    except Exception as e:
+    except (RuntimeError, ValueError, TypeError) as e:
         error_msg = f"Criticism analysis failed: {str(e)}"
         print(error_msg)
         await mcp_client.close()
@@ -190,11 +241,13 @@ Recommendation: Proceed with caution and conduct thorough testing.
             "criticism_text": f"Critical analysis unavailable for: {idea}",
             "idea": idea,
             "viability_score": 30.0,  # Low score due to inability to analyze
+            "component_scores": {},  # Empty for error case
             "research_quality": "unavailable",
             "risk_factors_identified": False,
             "recommendations_provided": False,
             "analysis_method": "error",
             "error": error_msg,
+            "components_analyzed": [],
         }
 
         return {

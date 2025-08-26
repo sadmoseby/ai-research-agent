@@ -10,7 +10,6 @@ class ResearchPrompts:
     # Configuration constants
     MIN_VIABILITY_SCORE = 51  # Minimum score to proceed to synthesis
     MAX_PLANNING_ITERATIONS = 3  # Maximum times to restart planning
-    PRIOR_ART_THRESHOLD = 3  # Number of prior art results that trigger restart
 
     # Planning node prompts
     PLANNING_SYSTEM_PROMPT = """
@@ -30,14 +29,416 @@ Use the available tools to gather comprehensive research on the given topic.
 Prioritize academic sources, industry reports, and technical documentation.
 """
 
-    PRIOR_ART_SYSTEM_PROMPT = """
-You are a prior art researcher specializing in quantitative finance implementations.
+    WEB_RESEARCH_COMPREHENSIVE_SYSTEM_PROMPT = """
+You are a senior quantitative finance researcher and strategy developer conducting
+comprehensive research for algorithmic trading strategies.
 
 Available MCP Tools: {available_tools}
 
-Use the available tools to search for existing implementations and similar approaches.
-Focus on GitHub repositories, academic code, and open-source trading frameworks.
+Your task is to conduct deep, comprehensive research and expand the given trading
+idea into a detailed, verbose proposal that can later be converted into a
+structured JSON schema format.
+
+CRITICAL REQUIREMENTS:
+1. Use your web search tools extensively to gather current market information, academic research, and industry insights
+2. Expand the basic idea into a comprehensive strategy proposal with detailed explanations
+3. Include specific market analysis, methodology details, risk considerations, and implementation approaches
+4. Focus on creating content suitable for {alpha_only} mode research
+5. Provide extensive detail that would allow later conversion to a structured research proposal format
+6. Never include actual trading code - only conceptual descriptions and methodologies
+
+Research Approach:
+- Search for academic papers and industry research on the strategy type
+- Look for current market conditions and relevant data sources
+- Investigate similar approaches and their effectiveness
+- Research risk factors and market dynamics
+- Find implementation considerations and parameter optimization approaches
+
+Output a comprehensive, detailed research document that thoroughly expands on the core idea.
 """
+
+    WEB_RESEARCH_COMPREHENSIVE_USER_PROMPT = """
+Conduct comprehensive research and expand this trading strategy idea into a detailed proposal:
+
+CORE IDEA: {idea}
+
+RESEARCH PLAN CONTEXT:
+{research_plan}
+
+ALPHA-ONLY MODE: {alpha_only}
+
+Please use your web search capabilities to research and then provide a
+comprehensive, detailed expansion of this idea that includes:
+
+1. **Strategy Overview & Market Context**
+   - Detailed explanation of the core concept and its theoretical foundation
+   - Current market conditions and relevance
+   - Target markets and asset classes
+
+2. **Methodology & Implementation Approach**
+   - Step-by-step description of how the strategy would work
+   - Data requirements and sources
+   - Signal generation methodology
+   - Entry/exit criteria and logic
+
+3. **Academic & Industry Research**
+   - Relevant academic papers and research findings
+   - Industry analysis and market studies
+   - Historical performance of similar approaches
+   - Current trends and developments
+
+4. **Risk Analysis & Considerations**
+   - Market risks and limitations
+   - Potential failure modes
+   - Risk management approaches
+   - Performance expectations and limitations
+
+5. **Parameter Optimization & Configuration**
+   - Key parameters that would need tuning
+   - Optimization approaches and considerations
+   - Sensitivity analysis requirements
+
+6. **Universe Definition** (for alpha-only mode)
+   - Asset selection criteria
+   - Market segments and filters
+   - Liquidity and tradability requirements
+
+Generate a verbose, comprehensive research document that provides sufficient
+detail for later conversion into a structured JSON research proposal format.
+Focus on conceptual clarity and thorough analysis rather than implementation code.
+"""
+
+    # Component-specific research prompts
+    COMPONENT_RESEARCH_SYSTEM_PROMPTS = {
+        "UNIVERSE": """
+You are a quantitative finance researcher specializing in universe selection and asset screening.
+
+Available MCP Tools: {available_tools}
+
+Your task is to conduct comprehensive research specifically focused on universe definition,
+asset selection criteria, and market segmentation for the given trading strategy.
+
+IMPORTANT: Provide 1 or more distinct universe selection approaches. In the final LEAN algorithm,
+multiple universe models will be COMBINED using logical OR - meaning an asset will be included
+if it passes ANY of the universe selection criteria. This allows for broader, more robust
+asset selection that captures opportunities across different screening methodologies.
+
+Focus Areas:
+- Asset selection methodologies and screening criteria
+- Market segments and classification schemes
+- Liquidity requirements and tradability filters
+- Index methodologies and benchmark construction
+- Dynamic universe adjustment mechanisms
+- Regulatory and operational constraints
+
+Format your response with clear sections for each approach if providing multiple (e.g., "Approach 1:", "Approach 2:", etc.)
+""",
+        "ALPHA": """
+You are a quantitative finance researcher specializing in alpha generation and signal development.
+
+Available MCP Tools: {available_tools}
+
+Your task is to conduct comprehensive research specifically focused on alpha signal generation,
+feature engineering, and predictive modeling for the given trading strategy.
+
+IMPORTANT: Provide 1 or more distinct alpha generation approaches. In the final LEAN algorithm,
+multiple alpha models will be COMBINED by taking insights from ALL models into consideration
+for the final alpha signal. This ensemble approach leverages diverse signal sources and
+methodologies to create a more robust and comprehensive alpha generation system.
+
+Focus Areas:
+- Signal generation methodologies and feature engineering
+- Predictive modeling techniques and machine learning approaches
+- Alpha decay analysis and signal persistence
+- Multi-factor model construction
+- Risk-adjusted return optimization
+- Backtesting and validation frameworks
+
+Format your response with clear sections for each approach if providing multiple
+(e.g., "Approach 1:", "Approach 2:", etc.)
+""",
+        "PORTFOLIO": """
+You are a quantitative finance researcher specializing in portfolio construction and optimization.
+
+Available MCP Tools: {available_tools}
+
+Your task is to conduct comprehensive research specifically focused on portfolio construction,
+position sizing, and optimization techniques for the given trading strategy.
+
+IMPORTANT: Provide EXACTLY ONE portfolio construction approach. In the final LEAN algorithm,
+only ONE portfolio optimization model will be used as the definitive method for position
+sizing, weight allocation, and portfolio construction. This single model must be comprehensive
+and handle all aspects of portfolio management for the strategy.
+
+Focus Areas:
+- Portfolio optimization algorithms and techniques
+- Position sizing and weight allocation methods
+- Risk budgeting and diversification strategies
+- Constraints handling and optimization bounds
+- Rebalancing frequency and turnover management
+- Performance attribution and decomposition
+
+Provide a single, comprehensive portfolio construction methodology.
+""",
+        "EXECUTION": """
+You are a quantitative finance researcher specializing in execution algorithms and market microstructure.
+
+Available MCP Tools: {available_tools}
+
+Your task is to conduct comprehensive research specifically focused on execution strategies,
+transaction cost modeling, and order management for the given trading strategy.
+
+IMPORTANT: Provide EXACTLY ONE execution strategy approach. In the final LEAN algorithm,
+only ONE execution model will be used as the definitive method for order execution,
+transaction cost optimization, and trade implementation. This single model must comprehensively
+handle all aspects of trade execution for the strategy.
+
+Focus Areas:
+- Execution algorithm design and implementation
+- Transaction cost modeling and slippage estimation
+- Market impact analysis and footprint reduction
+- Order routing and venue selection
+- Timing optimization and market condition adaptation
+- Implementation shortfall and arrival price strategies
+
+Provide a single, comprehensive execution methodology.
+""",
+        "RISK": """
+You are a quantitative finance researcher specializing in risk modeling and management.
+
+Available MCP Tools: {available_tools}
+
+Your task is to conduct comprehensive research specifically focused on risk factor modeling,
+measurement, and management for the given trading strategy.
+
+IMPORTANT: Provide 1 or more distinct risk management approaches. In the final LEAN algorithm,
+multiple risk models will be COMBINED to create a comprehensive risk management framework
+that leverages insights from ALL risk modeling approaches. This multi-layered risk system
+provides robust protection through diverse risk measurement and management techniques.
+
+Focus Areas:
+- Risk factor identification and modeling
+- Volatility forecasting and regime detection
+- Correlation structure analysis and modeling
+- Value-at-Risk and Expected Shortfall estimation
+- Stress testing and scenario analysis
+- Risk budgeting and allocation frameworks
+
+Format your response with clear sections for each approach if providing multiple (e.g., "Approach 1:", "Approach 2:", etc.)
+""",
+    }
+
+    COMPONENT_RESEARCH_USER_PROMPTS = {
+        "UNIVERSE": """
+Conduct comprehensive research on universe selection for this trading strategy and provide
+1 or more distinct implementation approaches:
+
+CORE IDEA: {idea}
+RESEARCH PLAN CONTEXT: {research_plan}
+ALPHA-ONLY MODE: {alpha_only}
+
+COMBINATION LOGIC: In the final LEAN algorithm, multiple universe selection approaches will be
+combined using logical OR. An asset will be included in the trading universe if it passes ANY
+of the universe selection criteria. This creates a broader, more robust asset selection that
+captures opportunities across different methodologies.
+
+Please use your web search capabilities to research and provide detailed analysis. For each approach, cover:
+
+1. **Asset Selection Criteria**
+   - Fundamental screening requirements
+   - Technical eligibility filters
+   - Liquidity and volume thresholds
+   - Market capitalization constraints
+
+2. **Market Segmentation**
+   - Geographic and regional considerations
+   - Sector and industry classifications
+   - Style and factor exposures
+   - Investment universe boundaries
+
+3. **Dynamic Universe Management**
+   - Rebalancing frequency and triggers
+   - Entry and exit criteria for assets
+   - Corporate action handling
+   - Survivorship bias mitigation
+
+4. **Operational Considerations**
+   - Data availability and quality requirements
+   - Trading infrastructure constraints
+   - Regulatory and compliance requirements
+   - Cost and scalability factors
+
+Provide 1 or more universe selection approaches, each as a separate research finding with
+distinct methodologies and implementation details.
+""",
+        "ALPHA": """
+Conduct comprehensive research on alpha generation for this trading strategy and provide
+1 or more distinct implementation approaches:
+
+CORE IDEA: {idea}
+RESEARCH PLAN CONTEXT: {research_plan}
+ALPHA-ONLY MODE: {alpha_only}
+
+COMBINATION LOGIC: In the final LEAN algorithm, multiple alpha generation approaches will be
+combined by taking insights from ALL models into consideration for the final alpha signal. This
+ensemble approach leverages diverse signal sources, methodologies, and time horizons to create
+a more robust and comprehensive alpha generation system.
+
+Please use your web search capabilities to research and provide detailed analysis. For each approach, cover:
+
+1. **Signal Generation Methodology**
+   - Core alpha factors and features
+   - Data sources and preprocessing requirements
+   - Signal construction and normalization
+   - Combination and aggregation techniques
+
+2. **Predictive Modeling Approaches**
+   - Statistical and machine learning methods
+   - Model training and validation frameworks
+   - Overfitting prevention and regularization
+   - Walk-forward and cross-validation strategies
+
+3. **Alpha Characteristics**
+   - Expected alpha magnitude and persistence
+   - Decay patterns and refresh frequency
+   - Correlation with market factors
+   - Capacity and scalability limitations
+
+4. **Implementation Considerations**
+   - Signal latency and update frequency
+   - Computing requirements and infrastructure
+   - Data quality and availability constraints
+   - Model monitoring and maintenance
+
+Provide 1 or more alpha generation approaches, each as a separate research finding with
+distinct methodologies and implementation details.
+""",
+        "PORTFOLIO": """
+Conduct comprehensive research on portfolio construction for this trading strategy and provide
+EXACTLY ONE implementation approach:
+
+CORE IDEA: {idea}
+RESEARCH PLAN CONTEXT: {research_plan}
+ALPHA-ONLY MODE: {alpha_only}
+
+COMBINATION LOGIC: In the final LEAN algorithm, only ONE portfolio construction model will be
+used as the definitive method for position sizing, weight allocation, and portfolio optimization.
+This single model must comprehensively handle all aspects of portfolio management including risk
+budgeting, constraints, and rebalancing.
+
+Please use your web search capabilities to research and provide detailed analysis covering:
+
+1. **Optimization Framework**
+   - Objective function design and trade-offs
+   - Constraint specification and handling
+   - Risk model integration and factor exposure
+   - Transaction cost incorporation
+
+2. **Position Sizing Methods**
+   - Weight allocation algorithms
+   - Risk budgeting approaches
+   - Concentration limits and diversification
+   - Leverage and gross exposure management
+
+3. **Rebalancing Strategy**
+   - Frequency and timing considerations
+   - Threshold-based and calendar rebalancing
+   - Transaction cost minimization
+   - Market impact and timing optimization
+
+4. **Performance Characteristics**
+   - Expected return and risk profiles
+   - Turnover and capacity implications
+   - Sensitivity to market conditions
+   - Attribution and decomposition methods
+
+Provide ONE comprehensive portfolio construction approach that addresses all aspects of
+portfolio management for this strategy.
+""",
+        "EXECUTION": """
+Conduct comprehensive research on execution strategy for this trading strategy and provide
+EXACTLY ONE implementation approach:
+
+CORE IDEA: {idea}
+RESEARCH PLAN CONTEXT: {research_plan}
+ALPHA-ONLY MODE: {alpha_only}
+
+COMBINATION LOGIC: In the final LEAN algorithm, only ONE execution model will be used as the
+definitive method for order execution, transaction cost optimization, and trade implementation.
+This single model must comprehensively handle all aspects of trade execution including order
+routing, timing, and cost minimization.
+
+Please use your web search capabilities to research and provide detailed analysis covering:
+
+1. **Execution Algorithm Design**
+   - Order splitting and sizing strategies
+   - Timing and scheduling optimization
+   - Market condition adaptation
+   - Liquidity provision vs. consumption
+
+2. **Transaction Cost Management**
+   - Bid-ask spread modeling and prediction
+   - Market impact estimation and mitigation
+   - Slippage analysis and attribution
+   - Implementation shortfall optimization
+
+3. **Order Management**
+   - Venue selection and routing strategies
+   - Dark pool utilization and strategies
+   - Order type selection and conditioning
+   - Fill quality and execution analytics
+
+4. **Infrastructure Requirements**
+   - Latency and connectivity needs
+   - Risk management and pre-trade checks
+   - Post-trade analysis and reporting
+   - Regulatory compliance and reporting
+
+Provide ONE comprehensive execution approach that addresses all aspects of trade implementation for this strategy.
+""",
+        "RISK": """
+Conduct comprehensive research on risk management for this trading strategy and provide
+1 or more distinct implementation approaches:
+
+CORE IDEA: {idea}
+RESEARCH PLAN CONTEXT: {research_plan}
+ALPHA-ONLY MODE: {alpha_only}
+
+COMBINATION LOGIC: In the final LEAN algorithm, multiple risk management approaches will be
+combined to create a comprehensive risk management framework that leverages insights from ALL
+risk modeling approaches. This multi-layered risk system provides robust protection through
+diverse risk measurement techniques, scenario analysis, and management frameworks.
+
+Please use your web search capabilities to research and provide detailed analysis. For each approach, cover:
+
+1. **Risk Factor Modeling**
+   - Systematic risk factor identification
+   - Factor model specification and estimation
+   - Idiosyncratic risk characterization
+   - Model validation and testing
+
+2. **Risk Measurement**
+   - Volatility forecasting methodologies
+   - Value-at-Risk and Expected Shortfall
+   - Tail risk and extreme event modeling
+   - Risk decomposition and attribution
+
+3. **Risk Management Framework**
+   - Risk limits and monitoring systems
+   - Stress testing and scenario analysis
+   - Risk budgeting and allocation
+   - Dynamic hedging strategies
+
+4. **Implementation Considerations**
+   - Real-time risk monitoring systems
+   - Risk reporting and visualization
+   - Regulatory capital requirements
+   - Model risk and validation procedures
+
+Provide 1 or more risk management approaches, each as a separate research finding with
+distinct methodologies and implementation details.
+""",
+    }
 
     # Planning node prompts
     ALPHA_ONLY_RESEARCH_PLAN_TEMPLATE = """
@@ -73,6 +474,56 @@ Search Strategy:
 - Academic research
 """
 
+    @classmethod
+    def format_full_plan_for_components(cls, idea: str, components: list[str]) -> str:
+        """Format a full research plan scoped to specific components.
+
+        components: list of component keys in {UNIVERSE, ALPHA, PORTFOLIO, EXECUTION, RISK}
+        """
+        if not components:
+            return cls.FULL_RESEARCH_PLAN_TEMPLATE.format(idea=idea).strip()
+
+        # Friendly names and focus lines per component
+        friendly_name = {
+            "UNIVERSE": "Universe selection",
+            "ALPHA": "Alpha generation",
+            "PORTFOLIO": "Portfolio construction",
+            "EXECUTION": "Execution framework",
+            "RISK": "Risk model",
+        }
+
+        focus_line = {
+            "UNIVERSE": "Universe definition and asset selection criteria",
+            "ALPHA": "Alpha strategy design and signal methodology",
+            "PORTFOLIO": "Position sizing, constraints, and weighting schemes",
+            "EXECUTION": "Order routing, slippage/TC modeling, and scheduling",
+            "RISK": "Risk factor specification, limits, and monitoring",
+        }
+
+        search_hints = {
+            "UNIVERSE": ["universe selection methods", "asset screening criteria"],
+            "ALPHA": ["alpha signals research", "feature engineering"],
+            "PORTFOLIO": ["portfolio optimization", "position sizing"],
+            "EXECUTION": ["execution algorithms", "transaction cost modeling"],
+            "RISK": ["risk models", "factor models"],
+        }
+
+        # Preserve a consistent order
+        order = ["ALPHA", "RISK", "PORTFOLIO", "EXECUTION", "UNIVERSE"]
+        selected = [c for c in order if c in components]
+
+        lines = [f"Research Plan for Full Proposal (Scoped): {idea}\n", "Focus Areas:"]
+        for idx, c in enumerate(selected, start=1):
+            lines.append(f"{idx}. {friendly_name[c]} — {focus_line[c]}")
+
+        # Build component-aware search strategy
+        search_lines = ["\nSearch Strategy:", "- Comprehensive literature review on selected components"]
+        for c in selected:
+            for hint in search_hints[c]:
+                search_lines.append(f"- {hint}")
+
+        return ("\n".join(lines + search_lines)).strip()
+
     # Search query templates
     ALPHA_ONLY_SEARCH_QUERIES = [
         "{idea} trading strategy research",
@@ -89,15 +540,6 @@ Search Strategy:
         "risk management quantitative finance",
         "portfolio optimization techniques",
         "execution algorithms trading",
-    ]
-
-    # Prior art search queries
-    PRIOR_ART_QUERIES = [
-        "{idea} algorithm trading",
-        "{idea} quantitative finance",
-        "{idea} python trading strategy",
-        "lean algorithm framework",
-        "{idea} alpha research",
     ]
 
     # Criticism prompts
@@ -129,9 +571,6 @@ Please critically evaluate this research proposal idea: {idea}
 
 Research Context:
 {research_context}
-
-Prior Art Analysis:
-{prior_art_summary}
 
 Focus Areas for Criticism:
 1. **Market Structure Risks**: How might changing market conditions affect this strategy?
@@ -169,44 +608,75 @@ Market Context:
 """
 
     # Synthesis prompts
+    # Unified synthesis prompt (handles both new synthesis and repair)
     SYNTHESIS_SYSTEM_PROMPT = """
 You are a quantitative finance research expert generating a Lean algorithm research proposal.
 
-{alpha_mode_note}Generate a research proposal that strictly follows the provided JSON schema.
+You must generate a research proposal that strictly follows the provided JSON schema.
 
-Available MCP Tools: {available_tools}
+FULL JSON SCHEMA:
+{json_schema}
 
-Key Requirements:
+SCHEMA OVERVIEW:
+- "universe": Market universe definition (new, existing, or amend)
+- "alphas": Alpha signal definitions (new, existing, or amend)
+- "portfolio": Portfolio construction logic (new, existing, or amend)
+- "execution": Execution model definitions (new, existing, or amend)
+- "risk": Risk management components (new, existing, or amend)
+- "misc": Free-form metadata and additional information
+- "inspiration": Free-form text field for strategy inspiration
+- "alpha-only": Boolean flag for alpha-only mode restrictions
+
+ALPHA-ONLY MODE CONSTRAINTS:
+When alpha-only mode is enabled, the proposal must contain ONLY:
+- "alphas": Exactly one item in either "new" or "amend" (NOT "existing")
+- "universe": Exactly one item in "existing" only
+- "alpha-only": Must be set to true
+All other properties (portfolio, execution, risk, etc.) must be omitted or empty.
+
+CORE REQUIREMENTS:
 - Never include actual trading code - only plain-language descriptions in 'text' fields
-- For alpha-only proposals: include exactly one alpha (new or amend) and one existing universe
 - All components must have clear text descriptions of their logic and methodology
 - Include proper parameter definitions with tuning distributions where applicable
 - Ensure all required fields are present and properly typed
-- This proposal is generated using MCP (Model Context Protocol) for tool integrations
-- Use the available MCP tools for any additional research or validation needs during synthesis
+- Use descriptive names and clear explanations for all components
+- Reference research findings and methodology in component descriptions
 
-{repair_context}
+RESPONSE FORMAT:
+Return only valid JSON that conforms exactly to the schema. The LLM client will
+validate against the schema automatically.
 """
 
     SYNTHESIS_USER_PROMPT = """
-Generate a comprehensive research proposal for: {idea}
+{task_context}
 
-Research Context:
+IDEA: {idea}
+
+RESEARCH CONTEXT:
 {research_context}
 
-Requirements:
+CONFIGURATION:
 - Alpha-only mode: {alpha_only}
-- Must conform to the provided JSON schema
-- Include detailed text descriptions (no code)
-- Specify relevant parameters with tuning configurations
-- Reference the research findings in component descriptions
-- Acknowledge that research was conducted using MCP tool integrations
+- Available MCP tools: {available_tools}
+- Target components: {component_names}
 
-If you need additional information during synthesis, use the available MCP tools to:
-- Verify technical details via web search
-- Check for additional prior art via GitHub search
-- Access academic sources via Tavily
-- Read or write temporary files via filesystem operations
+{validation_context}
+
+REQUIREMENTS:
+- Base your proposal on the research context provided above
+- Include detailed text descriptions (no trading code)
+- Specify relevant parameters with appropriate tuning configurations
+- Reference the research findings in your component descriptions
+- Ensure the proposal reflects insights from the web research and prior art analysis
+- If alpha-only mode is enabled, include exactly one alpha and one existing universe only
+
+ADDITIONAL CONTEXT:
+- This proposal was generated using MCP (Model Context Protocol) for tool integrations
+- The research was conducted using web search, GitHub analysis, and other MCP tools
+- Consider the prior art analysis when designing novel components
+- Use the available tools if you need additional information during synthesis
+
+Generate the JSON proposal now:
 """
 
     RESEARCH_CONTEXT_TEMPLATE = """
@@ -222,8 +692,6 @@ Prior Art Analysis (via MCP):
 - Found {total_found} related implementations
 - Search Method: {search_method}
 
-Critical Analysis:
-{criticism_summary}
 """
 
     WEB_RESULT_TEMPLATE = """
@@ -243,14 +711,6 @@ Please fix these validation errors in the output.
     WEB_SEARCH_ERROR_TITLE = "Search failed for: {query}"
     WEB_SEARCH_ERROR_CONTENT = "Web search temporarily unavailable for query: {query}"
 
-    PRIOR_ART_NOVEL_REASONING = "No similar implementations found in public repositories via MCP search."
-    PRIOR_ART_SIMILAR_REASONING_FEW = (
-        "Found {count} potentially related implementations via MCP, but appears to have novel aspects."
-    )
-    PRIOR_ART_SIMILAR_REASONING_MANY = (
-        "Found {count} related implementations via MCP. Consider differentiating factors."
-    )
-
     # Validation messages
     VALIDATION_NO_PROPOSAL_ERROR = "No proposal found to validate"
     VALIDATION_NO_PROPOSAL_REPORT = "Failed - no proposal generated"
@@ -264,11 +724,19 @@ Please fix these validation errors in the output.
     # Persistence messages
     PERSISTENCE_NO_PROPOSAL_ERROR = "No final proposal to persist"
     PERSISTENCE_SAVE_ERROR_TEMPLATE = "Failed to save proposal: {error}"
+    PERSISTENCE_STATE_SAVE_ERROR_TEMPLATE = "Failed to save final state: {error}"
 
     @classmethod
     def get_alpha_mode_note(cls, alpha_only: bool) -> str:
         """Get the alpha mode note for system prompt."""
-        return "ALPHA-ONLY MODE: " if alpha_only else ""
+        if alpha_only:
+            return """ALPHA-ONLY MODE:
+- Only include these fields: 'alphas', 'universe', 'alpha-only'
+- Do NOT include: '$schema', '$id', 'title', 'schemaVersion', 'misc', 'inspiration', or any other fields
+- Set 'alpha-only': true
+- Include exactly 1 alpha (new or amend) and 1 existing universe
+"""
+        return ""
 
     @classmethod
     def format_available_tools(cls, mcp_tools: list) -> str:
@@ -309,25 +777,106 @@ Please fix these validation errors in the output.
         return cls.VALIDATION_ERRORS_CONTEXT.format(errors="\n".join(errors))
 
     @classmethod
+    def format_component_research_context(
+        cls, research_plan: str, component_research_results: dict, web_results: list, idea: str
+    ) -> str:
+        """Format component-specific research context for synthesis."""
+        # Start with idea and research plan
+        context = f"Research Idea: {idea}\n\nResearch Plan:\n{research_plan}\n\n"
+
+        # Add component-specific research findings
+        if component_research_results:
+            context += "COMPONENT-SPECIFIC RESEARCH FINDINGS:\n\n"
+
+            # Process each component with more comprehensive content for synthesis
+            component_order = ["ALPHA", "UNIVERSE", "PORTFOLIO", "EXECUTION", "RISK"]
+            for component in component_order:
+                if component in component_research_results:
+                    context += f"=== {component} RESEARCH ===\n"
+
+                    results = component_research_results[component]
+                    for i, result in enumerate(results, 1):
+                        title = result.get("title", "Untitled")
+                        content = result.get("content", "")
+                        approach_num = result.get("approach_number", i)
+
+                        context += f"Approach {approach_num}: {title}\n"
+                        context += f"Content: {content}\n\n"
+
+                    context += "\n"
+
+        # Add fallback to general web results if available
+        if web_results and not component_research_results:
+            context += "GENERAL RESEARCH FINDINGS:\n"
+            for i, result in enumerate(web_results[:5], 1):
+                title = result.get("title", "Untitled")
+                content = result.get("content", "")[:300]
+                context += f"{i}. {title}: {content}...\n\n"
+
+        return context
+
+    @classmethod
+    def get_task_context(cls, is_repair: bool = False, original_proposal: str = "") -> str:
+        """Get task context for synthesis (new) vs repair."""
+        if is_repair:
+            return f"""TASK: Fix the validation errors in this existing research proposal.
+
+ORIGINAL PROPOSAL WITH ERRORS:
+```json
+{original_proposal}
+```
+
+You must analyze the validation errors and return a corrected version that:
+1. Fixes ALL validation errors completely
+2. Maintains the original research intent and content
+3. Preserves all valid components and descriptions
+4. Only makes minimal necessary changes to resolve errors"""
+        else:
+            return "TASK: Generate a comprehensive research proposal for the following trading strategy idea."
+
+    @classmethod
+    def get_validation_context(cls, validation_errors: list) -> str:
+        """Get validation context for error feedback."""
+        if not validation_errors:
+            return ""
+
+        error_text = cls.format_validation_errors(validation_errors)
+        return f"""
+VALIDATION ERRORS TO FIX:
+{error_text}
+
+Please address each validation error listed above in your response.
+"""
+
+    @classmethod
     def get_search_queries(cls, idea: str, alpha_only: bool) -> list:
         """Get formatted search queries based on mode."""
         queries = cls.ALPHA_ONLY_SEARCH_QUERIES if alpha_only else cls.FULL_SEARCH_QUERIES
         return [query.format(idea=idea) for query in queries]
 
     @classmethod
-    def get_prior_art_queries(cls, idea: str) -> list:
-        """Get formatted prior art search queries."""
-        return [query.format(idea=idea) for query in cls.PRIOR_ART_QUERIES]
-
-    @classmethod
-    def get_prior_art_reasoning(cls, results_count: int) -> tuple[str, str]:
-        """Get prior art verdict and reasoning based on results count."""
-        if results_count == 0:
-            return "novel", cls.PRIOR_ART_NOVEL_REASONING
-        elif results_count < 3:
-            return "similar", cls.PRIOR_ART_SIMILAR_REASONING_FEW.format(count=results_count)
-        else:
-            return "similar", cls.PRIOR_ART_SIMILAR_REASONING_MANY.format(count=results_count)
+    def get_component_scoped_queries(cls, idea: str, components: list[str], alpha_only: bool) -> list:
+        """Bias search queries toward selected components."""
+        base = cls.get_search_queries(idea, alpha_only)
+        hints = {
+            "UNIVERSE": ["universe selection", "asset screening", "index methodology"],
+            "ALPHA": ["alpha signals", "feature engineering", "predictive modeling"],
+            "PORTFOLIO": ["portfolio optimization", "risk-parity", "position sizing"],
+            "EXECUTION": ["execution algorithms", "slippage", "transaction costs"],
+            "RISK": ["risk model", "factor exposures", "volatility targeting"],
+        }
+        scoped = []
+        for c in components or []:
+            for h in hints.get(c, []):
+                scoped.append(f"{idea} {h}")
+        # Return scoped first then base to ensure focus, de-duplicated preserving order
+        seen = set()
+        ordered = []
+        for q in scoped + base:
+            if q not in seen:
+                seen.add(q)
+                ordered.append(q)
+        return ordered
 
     @classmethod
     def format_criticism_context(cls, research_plan: str, web_results: list, idea: str) -> str:
@@ -346,7 +895,7 @@ Please fix these validation errors in the output.
                 content = result.get("content", "")[:200]
                 research_summary += f"{i}. {title}: {content}...\n"
 
-        return cls.CRITICISM_CONTEXT_TEMPLATE.format(
+        context = cls.CRITICISM_CONTEXT_TEMPLATE.format(
             research_plan=research_plan,
             research_summary=research_summary or "Limited research data available",
             strategy_type=strategy_type,
@@ -354,17 +903,128 @@ Please fix these validation errors in the output.
             time_horizon=time_horizon,
         )
 
-    @classmethod
-    def format_prior_art_summary(cls, prior_art_results: dict) -> str:
-        """Format prior art results for criticism context."""
-        verdict = prior_art_results.get("verdict", "unknown")
-        reasoning = prior_art_results.get("reasoning", "No analysis available")
-        total_found = prior_art_results.get("total_found", 0)
+        # Include the idea explicitly to avoid loss of context and satisfy linters
+        return f"Idea: {idea}\n" + context
 
-        return f"""
-Prior Art Verdict: {verdict}
-Reasoning: {reasoning}
-Related Implementations Found: {total_found}
+    @classmethod
+    def format_component_criticism_context(
+        cls, research_plan: str, component_research_results: dict, web_results: list, idea: str
+    ) -> str:
+        """Format context for component-specific criticism analysis."""
+        # Start with idea context
+        context = f"Idea: {idea}\n\nResearch Plan:\n{research_plan}\n\n"
+
+        # Add component-specific research findings
+        if component_research_results:
+            context += "COMPONENT-SPECIFIC RESEARCH FINDINGS:\n\n"
+
+            # Process each component
+            component_order = ["ALPHA", "UNIVERSE", "PORTFOLIO", "EXECUTION", "RISK"]
+            for component in component_order:
+                if component in component_research_results:
+                    context += f"=== {component} RESEARCH ===\n"
+
+                    results = component_research_results[component]
+                    for result in results[:2]:  # Limit to first 2 results per component
+                        title = result.get("title", "Untitled")
+                        content = result.get("content", "")[:400]  # More content for component-specific
+                        context += f"Title: {title}\n"
+                        context += f"Content: {content}...\n\n"
+
+                    context += "\n"
+
+            # Add combined research summary if no component results but we have web results
+        elif web_results:
+            context += "GENERAL RESEARCH FINDINGS:\n"
+            for i, result in enumerate(web_results[:3], 1):
+                title = result.get("title", "Untitled")
+                content = result.get("content", "")[:200]
+                context += f"{i}. {title}: {content}...\n"
+        else:
+            context += "LIMITED RESEARCH DATA AVAILABLE\n"
+
+        return context
+
+    # Component-specific criticism prompts
+    COMPONENT_CRITICISM_SYSTEM_PROMPT = """
+You are a senior quantitative finance researcher and risk management expert tasked with critically evaluating
+component-specific research for algorithmic trading strategies.
+
+Your role is to identify potential flaws, risks, limitations, and areas for improvement in each component
+of a quantitative trading strategy BEFORE the strategy is fully developed.
+
+Available MCP Tools: {available_tools}
+
+Component-Specific Focus Areas:
+
+**UNIVERSE Component:**
+- Asset selection criteria robustness
+- Liquidity and tradability constraints
+- Universe stability and turnover
+- Data availability and quality
+- Survivorship bias risks
+
+**ALPHA Component:**
+- Signal strength and persistence
+- Overfitting and data snooping risks
+- Alpha decay and degradation
+- Feature engineering validity
+- Out-of-sample performance concerns
+
+**PORTFOLIO Component:**
+- Optimization framework robustness
+- Position sizing effectiveness
+- Risk budgeting appropriateness
+- Rebalancing frequency impact
+- Transaction cost integration
+
+**EXECUTION Component:**
+- Market impact estimation accuracy
+- Execution algorithm effectiveness
+- Latency and infrastructure requirements
+- Order management complexity
+- Real-world implementation challenges
+
+**RISK Component:**
+- Risk factor completeness
+- Model specification accuracy
+- Risk measurement methodology
+- Stress testing adequacy
+- Dynamic risk adjustment needs
+
+Be constructive but thorough in identifying potential issues for each component.
+Use the available MCP tools to gather additional context or verify claims if needed.
+"""
+
+    COMPONENT_CRITICISM_USER_PROMPT = """
+Please critically evaluate this component-specific research for the trading strategy idea: {idea}
+
+{component_research_context}
+
+For each component researched, provide detailed criticism covering:
+
+1. **Methodological Soundness**: Are the proposed approaches theoretically sound?
+2. **Implementation Feasibility**: Can these approaches be practically implemented?
+3. **Data Dependencies**: What data quality or availability issues could arise?
+4. **Risk Factors**: What component-specific risks might not be obvious?
+5. **Integration Challenges**: How well will components work together?
+6. **Scalability Concerns**: How might each component perform at different scales?
+7. **Market Regime Dependencies**: How sensitive are components to market conditions?
+
+For missing components, note potential gaps and integration challenges.
+
+Provide specific recommendations for improving each component's design and implementation.
+
+IMPORTANT: Provide both:
+1. COMPONENT SCORES (0-100) for each researched component
+2. Overall VIABILITY SCORE (0-100) where:
+   - 0-30: Major fundamental flaws, high risk of failure
+   - 31-50: Significant concerns but potentially salvageable with major modifications
+   - 51-70: Moderate concerns, needs refinement but viable
+   - 71-85: Good concept with minor issues to address
+   - 86-100: Excellent concept with minimal concerns
+
+Format component scores as "COMPONENT_SCORE_[COMPONENT]: XX" and overall score as "VIABILITY SCORE: XX" at the end.
 """
 
     @classmethod
@@ -421,19 +1081,23 @@ Critical Analysis: {criticism_text}
         return 50.0
 
     @classmethod
-    def should_restart_for_prior_art(cls, prior_art_results: dict) -> tuple[bool, str]:
-        """Determine if planning should restart based on prior art."""
-        total_found = prior_art_results.get("total_found", 0)
-        verdict = prior_art_results.get("verdict", "unknown")
+    def extract_component_scores(cls, criticism_text: str) -> dict:
+        """Extract component scores from criticism text."""
+        import re
 
-        if verdict == "novel":
-            return False, ""
+        component_scores = {}
 
-        if total_found >= cls.PRIOR_ART_THRESHOLD:
-            reason = f"Found {total_found} similar implementations - need to differentiate approach"
-            return True, reason
+        # Look for "COMPONENT_SCORE_[COMPONENT]: XX" pattern
+        pattern = r"COMPONENT_SCORE_([A-Z]+):\s*(\d+)"
+        matches = re.findall(pattern, criticism_text, re.IGNORECASE)
 
-        return False, ""
+        for component, score in matches:
+            try:
+                component_scores[component.upper()] = float(score)
+            except ValueError:
+                continue
+
+        return component_scores
 
     @classmethod
     def should_restart_for_criticism(cls, criticism_score: float, iteration: int) -> tuple[bool, str]:

@@ -3,7 +3,16 @@ State management for the Lean Research Agent using LangGraph.
 """
 
 from dataclasses import dataclass
+from enum import IntFlag
 from typing import Any, Dict, List, Optional, TypedDict
+
+
+class ResearchComponents(IntFlag):
+    UNIVERSE = 1 << 0
+    ALPHA = 1 << 1
+    PORTFOLIO = 1 << 2
+    EXECUTION = 1 << 3
+    RISK = 1 << 4
 
 
 class ResearchState(TypedDict, total=False):
@@ -12,6 +21,7 @@ class ResearchState(TypedDict, total=False):
     # Input
     idea: str
     alpha_only: bool
+    components: ResearchComponents
     slug: str
 
     # Current step tracking
@@ -24,7 +34,7 @@ class ResearchState(TypedDict, total=False):
 
     # Research phase
     web_search_results: Optional[List[Dict[str, Any]]]
-    prior_art_results: Optional[Dict[str, Any]]
+    component_research_results: Optional[Dict[str, List[Dict[str, Any]]]]  # Component-specific results
     mcp_tools_used: Optional[List[str]]  # Track which tools were actually used
 
     # Criticism phase
@@ -46,6 +56,7 @@ class ResearchState(TypedDict, total=False):
     # Output
     final_proposal: Optional[Dict[str, Any]]
     proposal_path: Optional[str]
+    state_path: Optional[str]
 
     # Error handling
     error: Optional[str]
@@ -60,13 +71,3 @@ class SearchResult:
     url: str
     content: str
     source: str  # "openai_web" or "tavily"
-
-
-@dataclass
-class PriorArtResult:
-    """Structure for prior art check results."""
-
-    query: str
-    github_results: List[Dict[str, Any]]
-    verdict: str  # "novel", "similar", "duplicate"
-    reasoning: str

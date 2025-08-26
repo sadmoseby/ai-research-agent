@@ -1,8 +1,12 @@
-# Multi-Provider LLM Integration Summary
+# Multi-Provider LLM Implementation Details
+
+## Implementation Summary
+
+This document provides technical details about the multi-provider LLM integration implementation. For configuration instructions, see [CONFIGURATION_GUIDE.md](./CONFIGURATION_GUIDE.md).
 
 ## What Was Implemented
 
-This implementation adds comprehensive support for multiple LLM providers (OpenAI, Anthropic, Gemini, and Ollama) to the AI Research Agent using LangChain abstractions.
+Comprehensive support for multiple LLM providers (OpenAI, Anthropic, Gemini, and Ollama) using LangChain abstractions.
 
 ## Key Components Added/Modified
 

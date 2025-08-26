@@ -1,13 +1,10 @@
-# Criticism Node Addition
+# Criticism Node Implementation
 
 ## Overview
 
-A new criticism node has been added to the research agent workflow to provide critical evaluation of research proposals before synthesis. This enhances the quality of generated proposals by identifying potential issues, risks, and areas for improvement.
+The criticism node provides critical evaluation of research proposals before synthesis, enhancing proposal quality by identifying potential issues, risks, and areas for improvement. For overall architecture details, see [ARCHITECTURE_OVERVIEW.md](./ARCHITECTURE_OVERVIEW.md).
 
-**New Feature**: The workflow now includes conditional routing that restarts planning if:
-
-1. Significant prior art is found (3+ similar implementations)
-2. The proposal receives a low viability score (<51/100) from criticism
+**Key Feature**: Conditional routing that restarts planning if the proposal receives a low viability score (<51/100) or if significant prior art is found (3+ similar implementations).
 
 ## Workflow Changes
 
