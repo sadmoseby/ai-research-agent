@@ -34,6 +34,7 @@ async def synthesize_node(state: ResearchState, config: Config) -> Dict[str, Any
 
     # Prepare context from research
     idea = state["idea"]
+    instruments = state.get("instruments", [])
     alpha_only = state.get("alpha_only", False)
     research_plan = state.get("research_plan", "")
     web_results = state.get("web_search_results", [])
@@ -98,6 +99,7 @@ async def synthesize_node(state: ResearchState, config: Config) -> Dict[str, Any
             llm_client=llm_client,
             schema=schema,
             idea=idea,
+            instruments=instruments,
             research_plan=research_plan,
             component_search_results=component_search_results,
             prior_art=prior_art,
@@ -111,6 +113,7 @@ async def synthesize_node(state: ResearchState, config: Config) -> Dict[str, Any
             llm_client=llm_client,
             schema=schema,
             idea=idea,
+            instruments=instruments,
             research_context=research_context,
             alpha_only=alpha_only,
             available_tools=tools_formatted,
@@ -135,6 +138,9 @@ async def synthesize_node(state: ResearchState, config: Config) -> Dict[str, Any
         proposal_json["misc"]["generated_by"] = "lean-research-agent-mcp"
         proposal_json["misc"]["tool_protocol"] = "mcp"
         proposal_json["misc"]["mcp_tools_available"] = available_tools
+
+    # Always add instruments field regardless of mode
+    proposal_json["instruments"] = instruments
 
     try:
         # Unified validation and repair loop
@@ -164,6 +170,7 @@ async def synthesize_node(state: ResearchState, config: Config) -> Dict[str, Any
                     llm_client=llm_client,
                     schema=schema,
                     idea=idea,
+                    instruments=instruments,
                     research_context=research_context,
                     alpha_only=alpha_only,
                     available_tools=tools_formatted,
@@ -212,6 +219,7 @@ async def _generate_proposal(
     llm_client: LLMClient,
     schema: Dict[str, Any],
     idea: str,
+    instruments: list,
     research_context: str,
     alpha_only: bool,
     available_tools: str,
@@ -231,11 +239,13 @@ async def _generate_proposal(
     schema_json_str = json.dumps(schema, indent=2)
     system_prompt = ResearchPrompts.SYNTHESIS_SYSTEM_PROMPT.format(
         json_schema=schema_json_str,
+        instruments=", ".join(instruments),
     )
 
     user_prompt = ResearchPrompts.SYNTHESIS_USER_PROMPT.format(
         task_context=task_context,
         idea=idea,
+        instruments=", ".join(instruments),
         research_context=research_context,
         alpha_only=alpha_only,
         available_tools=available_tools,
@@ -274,6 +284,7 @@ async def _generate_component_by_component_proposal(
     llm_client: LLMClient,
     schema: Dict[str, Any],
     idea: str,
+    instruments: list,
     research_plan: str,
     component_search_results: Dict[str, List[Dict[str, Any]]],
     prior_art: Dict[str, Any],

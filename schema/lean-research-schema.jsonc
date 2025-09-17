@@ -16,19 +16,30 @@
       "type": "string",
       "description": "Free-form text field"
     },
+    "instruments": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": ["stocks", "options", "futures", "forex", "crypto"]
+      },
+      "minItems": 1,
+      "uniqueItems": true,
+      "description": "Financial instruments that the trading algorithm is designed to trade. Must specify at least one instrument type."
+    },
     "alpha-only": {
       "type": "boolean",
       "default": false,
       "description": "If true, only 'alphas' and 'universe' properties are permitted (plus this flag)."
     }
   },
+  "required": ["instruments"],
   "if": {
     "properties": { "alpha-only": { "const": true } },
     "required": ["alpha-only"]
   },
   "then": {
-    "propertyNames": { "enum": ["alphas", "universe", "alpha-only"] },
-    "required": ["alphas", "universe"],
+    "propertyNames": { "enum": ["alphas", "universe", "instruments", "alpha-only"] },
+    "required": ["alphas", "universe", "instruments"],
     // In alpha-only mode:
     // - alphas: exactly one item, and it must be in 'new'
     // - universe: exactly one item, and it must be in 'new'

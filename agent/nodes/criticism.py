@@ -16,6 +16,7 @@ logger = get_logger("nodes.criticism")
 
 async def _generate_criticism_analysis(
     idea: str,
+    instruments: list,
     research_context: str,
     llm_client: LLMClient,
     available_tools: list,
@@ -30,15 +31,21 @@ async def _generate_criticism_analysis(
 
     # Choose appropriate prompts based on whether we have component-specific research
     if use_component_specific:
-        system_prompt = ResearchPrompts.COMPONENT_CRITICISM_SYSTEM_PROMPT.format(available_tools=tools_formatted)
+        system_prompt = ResearchPrompts.COMPONENT_CRITICISM_SYSTEM_PROMPT.format(
+            available_tools=tools_formatted, instruments=", ".join(instruments)
+        )
         user_prompt = ResearchPrompts.COMPONENT_CRITICISM_USER_PROMPT.format(
             idea=idea,
+            instruments=", ".join(instruments),
             component_research_context=research_context,
         )
     else:
-        system_prompt = ResearchPrompts.CRITICISM_SYSTEM_PROMPT.format(available_tools=tools_formatted)
+        system_prompt = ResearchPrompts.CRITICISM_SYSTEM_PROMPT.format(
+            available_tools=tools_formatted, instruments=", ".join(instruments)
+        )
         user_prompt = ResearchPrompts.CRITICISM_USER_PROMPT.format(
             idea=idea,
+            instruments=", ".join(instruments),
             research_context=research_context,
         )
 
@@ -75,6 +82,7 @@ async def criticism_node(state: ResearchState, config: Config) -> Dict[str, Any]
 
     # Get context from previous steps
     idea = state["idea"]
+    instruments = state.get("instruments", [])
     research_plan = state.get("research_plan", "")
     # Include component scope note if available
     components_flag = state.get("components") or config.get_components_from_env()
@@ -131,6 +139,7 @@ async def criticism_node(state: ResearchState, config: Config) -> Dict[str, Any]
         # Generate criticism analysis with tool awareness and component-specific handling
         criticism_text = await _generate_criticism_analysis(
             idea=idea,
+            instruments=instruments,
             research_context=research_context,
             llm_client=llm_client,
             available_tools=available_tools,

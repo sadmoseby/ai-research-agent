@@ -15,6 +15,26 @@ from agent.graph import create_research_graph
 from agent.state import ResearchState
 
 
+def parse_instruments(instruments_str: str) -> list[str]:
+    """Parse a comma-separated string of instruments into a list."""
+    valid_instruments = {"stocks", "options", "futures", "forex", "crypto"}
+
+    if not instruments_str:
+        raise ValueError("Instruments cannot be empty")
+
+    instruments = [inst.strip().lower() for inst in instruments_str.split(",")]
+
+    # Validate each instrument
+    invalid_instruments = [inst for inst in instruments if inst not in valid_instruments]
+    if invalid_instruments:
+        raise ValueError(
+            f"Invalid instruments: {invalid_instruments}. " f"Valid options are: {', '.join(sorted(valid_instruments))}"
+        )
+
+    # Remove duplicates while preserving order
+    return list(dict.fromkeys(instruments))
+
+
 def create_slug(idea_text: str) -> str:
     """Create a filesystem-safe slug from idea text."""
     import re
@@ -44,10 +64,12 @@ async def propose_command(args):
         graph = create_research_graph(config)
 
         slug = args.slug or create_slug(args.idea)
+        instruments = parse_instruments(args.instruments)
 
         initial_state = ResearchState(
             idea=args.idea,
             alpha_only=args.alpha_only,
+            instruments=instruments,
             slug=slug,
             current_step="plan",
             should_restart_planning=False,
@@ -56,6 +78,7 @@ async def propose_command(args):
         )
 
         print(f"🔬 Starting research for: {args.idea}")
+        print(f"🎯 Trading instruments: {', '.join(instruments)}")
         print(f"📁 Will write to: proposals/{slug}.json")
 
         # Show synthesis mode
@@ -101,6 +124,11 @@ def main():
     # Propose command
     propose_parser = subparsers.add_parser("propose", help="Generate a research proposal")
     propose_parser.add_argument("--idea", required=True, help="Research idea (free text)")
+    propose_parser.add_argument(
+        "--instruments",
+        required=True,
+        help="Financial instruments to trade (comma-separated): stocks, options, futures, forex, crypto",
+    )
     propose_parser.add_argument("--alpha-only", action="store_true", help="Generate alpha-only proposal")
     propose_parser.add_argument("--slug", help="Custom slug for output filename")
     propose_parser.add_argument(

@@ -30,6 +30,7 @@ async def web_research_node(state: ResearchState, config: Config) -> Dict[str, A
     idea = state.get("idea", "")
     research_plan = state.get("research_plan", "")
     alpha_only = state.get("alpha_only", False)
+    instruments = state.get("instruments", [])
     components_flag = state.get("components") or config.get_components_from_env()
 
     logger.info("Conducting component-specific research for idea: %s", idea)
@@ -76,7 +77,7 @@ async def web_research_node(state: ResearchState, config: Config) -> Dict[str, A
 
             # Get component-specific research (now returns a list of approaches)
             component_approaches = await _conduct_component_research(
-                mcp_client, component, idea, research_plan, alpha_only, available_tools
+                mcp_client, component, idea, research_plan, alpha_only, available_tools, instruments
             )
 
             if component_approaches:
@@ -149,7 +150,13 @@ async def web_research_node(state: ResearchState, config: Config) -> Dict[str, A
 
 
 async def _conduct_component_research(
-    mcp_client: MCPClient, component: str, idea: str, research_plan: str, alpha_only: bool, available_tools: list
+    mcp_client: MCPClient,
+    component: str,
+    idea: str,
+    research_plan: str,
+    alpha_only: bool,
+    available_tools: list,
+    instruments: list,
 ) -> List[Dict[str, Any]]:
     """Conduct component-specific research using LLM with web search tool calling via MCP client.
 
@@ -160,11 +167,14 @@ async def _conduct_component_research(
     try:
         # Get component-specific prompts
         system_prompt = ResearchPrompts.COMPONENT_RESEARCH_SYSTEM_PROMPTS[component].format(
-            available_tools=available_tools
+            available_tools=available_tools, instruments=", ".join(instruments)
         )
 
         user_prompt = ResearchPrompts.COMPONENT_RESEARCH_USER_PROMPTS[component].format(
-            idea=idea, research_plan=research_plan, alpha_only="Yes" if alpha_only else "No"
+            idea=idea,
+            research_plan=research_plan,
+            alpha_only="Yes" if alpha_only else "No",
+            instruments=", ".join(instruments),
         )
 
         # Create a comprehensive research query based on the prompts

@@ -22,6 +22,7 @@ class ResearchState(TypedDict, total=False):
     idea: str
     alpha_only: bool
     components: ResearchComponents
+    instruments: List[str]  # Financial instruments: stocks, options, futures, forex, crypto
     slug: str
 
     # Current step tracking
