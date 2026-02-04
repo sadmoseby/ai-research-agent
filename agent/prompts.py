@@ -155,7 +155,20 @@ Available MCP Tools: {available_tools}
 Your task is to conduct comprehensive research specifically focused on universe definition,
 asset selection criteria, and market segmentation for the given trading strategy.
 
-IMPORTANT: Provide 1 or more distinct universe selection approaches. In the final LEAN algorithm,
+ALPHA-ONLY MODE: {alpha_only}
+
+IF ALPHA-ONLY MODE IS TRUE:
+Your task changes to selecting a SINGLE representative stock (preferably an ETF or index fund) 
+that best represents the asset class where the alpha strategy would be most effective. 
+Focus on finding ONE liquid, highly-traded security that captures the essence of the target market.
+Research should identify the most suitable ETF/index fund with:
+- High liquidity and trading volume
+- Broad representation of the target asset class
+- Strong correlation with the intended market segment
+- Low expense ratios and tracking error (for ETFs)
+
+IF ALPHA-ONLY MODE IS FALSE:
+Provide 1 or more distinct universe selection approaches. In the final LEAN algorithm,
 multiple universe models will be COMBINED using logical OR - meaning an asset will be included
 if it passes ANY of the universe selection criteria. This allows for broader, more robust
 asset selection that captures opportunities across different screening methodologies.
@@ -318,6 +331,33 @@ TARGET INSTRUMENTS: {instruments}
 RESEARCH PLAN CONTEXT: {research_plan}
 ALPHA-ONLY MODE: {alpha_only}
 
+IF ALPHA-ONLY MODE IS TRUE:
+Your task is to identify and research the SINGLE BEST representative stock/ETF/index fund 
+for this alpha strategy. Focus on finding ONE highly liquid security that captures the 
+essence of the target market where this alpha would be most effective.
+
+Research should identify:
+1. **Best Representative Security**
+   - Specific ticker symbol (e.g., SPY, QQQ, VTI, etc.)
+   - Full security name and description
+   - Why this security is ideal for testing the alpha
+   - Asset class representation (equity, fixed income, etc.)
+
+2. **Liquidity and Trading Characteristics**
+   - Average daily volume
+   - Bid-ask spreads
+   - Market capitalization or AUM
+   - Trading hours and availability
+
+3. **Market Representation**
+   - What market segment/factor it represents
+   - Correlation with broader market
+   - Expense ratio (for ETFs)
+   - Tracking error (for index funds)
+
+Provide a SINGLE recommendation with detailed justification.
+
+IF ALPHA-ONLY MODE IS FALSE:
 COMBINATION LOGIC: In the final LEAN algorithm, multiple universe selection approaches will be
 combined using logical OR. An asset will be included in the trading universe if it passes ANY
 of the universe selection criteria. This creates a broader, more robust asset selection that
@@ -726,9 +766,26 @@ SCHEMA OVERVIEW:
 ALPHA-ONLY MODE CONSTRAINTS:
 When alpha-only mode is enabled, the proposal must contain ONLY:
 - "alphas": Exactly one item in either "new" or "amend" (NOT "existing")
-- "universe": Exactly one item in "existing" only
+- "universe": Exactly one item in "existing" only - this should be a SINGLE STOCK/ETF/INDEX
+  that represents the asset class where the alpha would be most effective. The universe.existing
+  array should contain one object with: symbol, name, description, and assetClass fields.
 - "alpha-only": Must be set to true
 All other properties (portfolio, execution, risk, etc.) must be omitted or empty.
+
+FOR ALPHA-ONLY UNIVERSE SELECTION:
+Research the most appropriate single stock/ETF/index fund that represents the target asset class
+for this alpha strategy. Popular choices include:
+- SPY (S&P 500 ETF) for large-cap US equity momentum/factor strategies
+- QQQ (Nasdaq 100 ETF) for tech/growth strategies  
+- IWM (Russell 2000 ETF) for small-cap strategies
+- VTI (Total Stock Market ETF) for broad market strategies
+- EFA (EAFE ETF) for international developed markets
+- EEM (Emerging Markets ETF) for emerging markets
+- TLT (20+ Year Treasury ETF) for bond/fixed income strategies
+- GLD (Gold ETF) for commodity strategies
+- BTC-USD or similar for crypto strategies
+
+Choose the single most representative security based on the alpha strategy and target instruments.
 
 CORE REQUIREMENTS:
 - Never include actual trading code - only plain-language descriptions in 'text' fields

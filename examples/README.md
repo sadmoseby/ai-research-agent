@@ -7,6 +7,7 @@ This directory contains example scripts demonstrating various features of the AI
 ### Core Usage Examples
 - `basic_usage.py` - Basic research workflow example
 - `web_research_demo.py` - Web research functionality demonstration
+- `components_cli_demo.py` - Component selection CLI feature demonstration
 
 ### Configuration Examples
 - `multi_provider_setup.py` - Multi-provider LLM configuration examples

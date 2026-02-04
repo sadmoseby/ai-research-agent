@@ -35,6 +35,41 @@ def parse_instruments(instruments_str: str) -> list[str]:
     return list(dict.fromkeys(instruments))
 
 
+def parse_components(components_str: str) -> int:
+    """Parse a comma-separated string of components into a ResearchComponents bitmask."""
+    from agent.state import ResearchComponents
+    
+    valid_components = {"universe", "alpha", "portfolio", "execution", "risk"}
+    
+    if not components_str:
+        raise ValueError("Components cannot be empty")
+    
+    components = [comp.strip().lower() for comp in components_str.split(",")]
+    
+    # Validate each component
+    invalid_components = [comp for comp in components if comp not in valid_components]
+    if invalid_components:
+        raise ValueError(
+            f"Invalid components: {invalid_components}. "
+            f"Valid options are: {', '.join(sorted(valid_components))}"
+        )
+    
+    # Map to bitmask
+    mapping = {
+        "universe": ResearchComponents.UNIVERSE,
+        "alpha": ResearchComponents.ALPHA,
+        "portfolio": ResearchComponents.PORTFOLIO,
+        "execution": ResearchComponents.EXECUTION,
+        "risk": ResearchComponents.RISK,
+    }
+    
+    bitmask = 0
+    for comp in components:
+        bitmask |= int(mapping[comp])
+    
+    return bitmask
+
+
 def create_slug(idea_text: str) -> str:
     """Create a filesystem-safe slug from idea text."""
     import re
@@ -48,12 +83,14 @@ def create_slug(idea_text: str) -> str:
 async def propose_command(args):
     """Execute the propose command."""
     try:
-        # Enable component-by-component synthesis by default, unless unified is requested
+        # Default to component-by-component synthesis for CLI usage
+        # This can be overridden with --unified-synthesis flag
         import os
 
         if args.unified_synthesis:
             os.environ["SYNTHESIZE_COMPONENT_BY_COMPONENT"] = "false"
-        elif "SYNTHESIZE_COMPONENT_BY_COMPONENT" not in os.environ:
+        else:
+            # Always default to component-by-component when using CLI
             os.environ["SYNTHESIZE_COMPONENT_BY_COMPONENT"] = "true"
 
         config = Config.from_env()
@@ -65,11 +102,17 @@ async def propose_command(args):
 
         slug = args.slug or create_slug(args.idea)
         instruments = parse_instruments(args.instruments)
+        
+        # Parse components if provided
+        components = None
+        if args.components:
+            components = parse_components(args.components)
 
         initial_state = ResearchState(
             idea=args.idea,
             alpha_only=args.alpha_only,
             instruments=instruments,
+            components=components,
             slug=slug,
             current_step="plan",
             should_restart_planning=False,
@@ -79,6 +122,20 @@ async def propose_command(args):
 
         print(f"🔬 Starting research for: {args.idea}")
         print(f"🎯 Trading instruments: {', '.join(instruments)}")
+        if components:
+            from agent.state import ResearchComponents
+            component_names = []
+            if components & ResearchComponents.UNIVERSE:
+                component_names.append("UNIVERSE")
+            if components & ResearchComponents.ALPHA:
+                component_names.append("ALPHA")
+            if components & ResearchComponents.PORTFOLIO:
+                component_names.append("PORTFOLIO")
+            if components & ResearchComponents.EXECUTION:
+                component_names.append("EXECUTION")
+            if components & ResearchComponents.RISK:
+                component_names.append("RISK")
+            print(f"🧩 Research components: {', '.join(component_names)}")
         print(f"📁 Will write to: proposals/{slug}.json")
 
         # Show synthesis mode
@@ -87,7 +144,7 @@ async def propose_command(args):
             if os.environ.get("SYNTHESIZE_COMPONENT_BY_COMPONENT", "false").lower() == "true"
             else "unified"
         )
-        print(f"⚙️  Synthesis mode: {synthesis_mode}")
+        print(f"⚙️  Synthesis mode: {synthesis_mode} (CLI default)")
         if args.alpha_only:
             print("🎯 Alpha-only mode: will use unified synthesis regardless of setting")
 
@@ -132,9 +189,13 @@ def main():
     propose_parser.add_argument("--alpha-only", action="store_true", help="Generate alpha-only proposal")
     propose_parser.add_argument("--slug", help="Custom slug for output filename")
     propose_parser.add_argument(
+        "--components",
+        help="Research components to focus on (comma-separated): universe, alpha, portfolio, execution, risk"
+    )
+    propose_parser.add_argument(
         "--unified-synthesis",
         action="store_true",
-        help="Use unified synthesis instead of component-by-component (default: component-by-component)",
+        help="Use unified synthesis instead of component-by-component synthesis (CLI defaults to component-by-component)",
     )
 
     args = parser.parse_args()

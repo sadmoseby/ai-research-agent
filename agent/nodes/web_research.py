@@ -167,7 +167,9 @@ async def _conduct_component_research(
     try:
         # Get component-specific prompts
         system_prompt = ResearchPrompts.COMPONENT_RESEARCH_SYSTEM_PROMPTS[component].format(
-            available_tools=available_tools, instruments=", ".join(instruments)
+            available_tools=available_tools, 
+            instruments=", ".join(instruments),
+            alpha_only="Yes" if alpha_only else "No"
         )
 
         user_prompt = ResearchPrompts.COMPONENT_RESEARCH_USER_PROMPTS[component].format(

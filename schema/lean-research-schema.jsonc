@@ -42,7 +42,7 @@
     "required": ["alphas", "universe", "instruments"],
     // In alpha-only mode:
     // - alphas: exactly one item, and it must be in 'new'
-    // - universe: exactly one item, and it must be in 'new'
+    // - universe: exactly one item, and it must be in 'existing' (static stock symbol)
     "properties": {
       "alphas": {
         "type": "object",
@@ -53,9 +53,36 @@
       },
       "universe": {
         "type": "object",
-        "required": ["new"],
+        "required": ["existing"],
         "properties": {
-          "new": { "type": "array", "minItems": 1, "maxItems": 1 }
+          "existing": { 
+            "type": "array", 
+            "minItems": 1, 
+            "maxItems": 1,
+            "items": {
+              "type": "object",
+              "required": ["symbol", "name", "description"],
+              "properties": {
+                "symbol": {
+                  "type": "string",
+                  "description": "Stock ticker symbol (e.g., 'SPY', 'QQQ')"
+                },
+                "name": {
+                  "type": "string", 
+                  "description": "Full name of the security"
+                },
+                "description": {
+                  "type": "string",
+                  "description": "Why this security represents the target asset class"
+                },
+                "assetClass": {
+                  "type": "string",
+                  "enum": ["equity", "fixed_income", "commodity", "currency", "crypto"],
+                  "description": "Asset class this security represents"
+                }
+              }
+            }
+          }
         }
       }
     }

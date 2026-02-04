@@ -114,7 +114,7 @@ def analyze_alpha_only_mode(proposal: Dict[str, Any]) -> List[str]:
         return ["Proposal is not in alpha-only mode"]
 
     # Check allowed fields in alpha-only mode
-    allowed_fields = {"alphas", "universe", "alpha-only"}
+    allowed_fields = {"alphas", "universe", "alpha-only", "instruments"}
     actual_fields = set(proposal.keys())
 
     extra_fields = actual_fields - allowed_fields

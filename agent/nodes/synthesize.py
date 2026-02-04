@@ -265,12 +265,30 @@ async def _generate_proposal(
 
         # Handle alpha-only mode restrictions
         if alpha_only:
-            allowed_fields = {"alphas", "universe", "alpha-only"}
+            allowed_fields = {"alphas", "universe", "alpha-only", "instruments"}
             fields_to_remove = [field for field in proposal_json.keys() if field not in allowed_fields]
             for field in fields_to_remove:
                 logger.info("Removing disallowed field '%s' from alpha-only proposal", field)
                 del proposal_json[field]
             proposal_json["alpha-only"] = True
+            
+            # Ensure universe is in "existing" format for alpha-only mode
+            if "universe" in proposal_json:
+                universe = proposal_json["universe"]
+                # If universe has "new" instead of "existing", transform it
+                if "new" in universe and "existing" not in universe:
+                    logger.info("Converting universe 'new' to 'existing' format for alpha-only mode")
+                    new_universe = universe["new"]
+                    if new_universe and len(new_universe) > 0:
+                        first_universe = new_universe[0]
+                        # Transform to existing format with static stock selection
+                        universe["existing"] = [{
+                            "symbol": _extract_or_default_symbol(first_universe, instruments),
+                            "name": _extract_or_default_name(first_universe, instruments),
+                            "description": _extract_or_default_description(first_universe, instruments),
+                            "assetClass": _extract_or_default_asset_class(instruments)
+                        }]
+                    del universe["new"]
 
         return proposal_json
 
@@ -431,3 +449,93 @@ Respond with valid JSON only."""
     except (RuntimeError, ValueError, TypeError) as e:
         logger.error("Failed to generate %s component: %s", schema_key, str(e))
         return None
+
+
+def _extract_or_default_symbol(universe_component: Dict[str, Any], instruments: List[str]) -> str:
+    """Extract symbol from universe component or provide default based on instruments."""
+    # Check if the component has a symbol or ticker mentioned
+    text_content = str(universe_component.get('text', '')) + str(universe_component.get('description', ''))
+    
+    # Common ETF patterns
+    etf_patterns = ['SPY', 'QQQ', 'VTI', 'IWM', 'EFA', 'EEM', 'TLT', 'GLD', 'BTC-USD', 'ETH-USD']
+    for pattern in etf_patterns:
+        if pattern in text_content.upper():
+            return pattern
+    
+    # Default based on instruments
+    if 'stocks' in instruments:
+        return 'SPY'  # S&P 500 ETF
+    elif 'crypto' in instruments:
+        return 'BTC-USD'  # Bitcoin
+    elif 'futures' in instruments:
+        return 'ES'  # E-mini S&P 500 futures
+    elif 'forex' in instruments:
+        return 'EUR/USD'  # Euro/Dollar
+    elif 'options' in instruments:
+        return 'SPY'  # SPY options
+    else:
+        return 'SPY'  # Default fallback
+
+
+def _extract_or_default_name(universe_component: Dict[str, Any], instruments: List[str]) -> str:
+    """Extract name from universe component or provide default."""
+    symbol = _extract_or_default_symbol(universe_component, instruments)
+    
+    name_mapping = {
+        'SPY': 'SPDR S&P 500 ETF Trust',
+        'QQQ': 'Invesco QQQ Trust ETF',
+        'VTI': 'Vanguard Total Stock Market ETF',
+        'IWM': 'iShares Russell 2000 ETF',
+        'EFA': 'iShares MSCI EAFE ETF',
+        'EEM': 'iShares MSCI Emerging Markets ETF',
+        'TLT': 'iShares 20+ Year Treasury Bond ETF',
+        'GLD': 'SPDR Gold Shares',
+        'BTC-USD': 'Bitcoin',
+        'ETH-USD': 'Ethereum',
+        'ES': 'E-mini S&P 500 Futures',
+        'EUR/USD': 'Euro/US Dollar Currency Pair'
+    }
+    
+    return name_mapping.get(symbol, f'{symbol} Security')
+
+
+def _extract_or_default_description(universe_component: Dict[str, Any], instruments: List[str]) -> str:
+    """Extract description from universe component or provide default."""
+    symbol = _extract_or_default_symbol(universe_component, instruments)
+    existing_desc = universe_component.get('description', '')
+    
+    if existing_desc and len(existing_desc) > 20:
+        return f"Representative {symbol} security chosen for alpha testing: {existing_desc}"
+    
+    desc_mapping = {
+        'SPY': 'Highly liquid S&P 500 ETF representing large-cap US equity market, ideal for testing equity momentum and factor strategies',
+        'QQQ': 'Technology-focused Nasdaq 100 ETF, excellent for growth and tech momentum strategies',
+        'VTI': 'Broad US total stock market ETF, perfect for testing market-wide alpha strategies',
+        'IWM': 'Small-cap Russell 2000 ETF, ideal for small-cap momentum and value strategies',
+        'EFA': 'International developed markets ETF, suitable for global equity strategies',
+        'EEM': 'Emerging markets ETF, perfect for testing strategies in developing economies',
+        'TLT': 'Long-term Treasury ETF, ideal for bond momentum and yield curve strategies',
+        'GLD': 'Gold ETF providing exposure to precious metals for commodity strategies',
+        'BTC-USD': 'Bitcoin cryptocurrency, perfect for testing crypto momentum and volatility strategies',
+        'ETH-USD': 'Ethereum cryptocurrency, ideal for DeFi and smart contract based strategies',
+        'ES': 'E-mini S&P 500 futures, excellent for leveraged equity strategies',
+        'EUR/USD': 'Major currency pair, perfect for forex carry trade and momentum strategies'
+    }
+    
+    return desc_mapping.get(symbol, f'{symbol} chosen as representative security for alpha strategy testing')
+
+
+def _extract_or_default_asset_class(instruments: List[str]) -> str:
+    """Determine asset class based on instruments."""
+    if 'stocks' in instruments:
+        return 'equity'
+    elif 'crypto' in instruments:
+        return 'crypto'
+    elif 'futures' in instruments:
+        return 'futures'
+    elif 'forex' in instruments:
+        return 'currency'
+    elif 'options' in instruments:
+        return 'equity'  # Options are typically on equity
+    else:
+        return 'equity'  # Default fallback
