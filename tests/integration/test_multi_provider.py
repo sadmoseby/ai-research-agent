@@ -17,7 +17,7 @@ async def test_providers():
     # Test 1: Load configuration
     print("1. Loading configuration...")
     try:
-        config = Config.from_env()
+        config = Config()
         print(f"   ✅ Loaded config with default provider: {config.default_config.llm_provider.provider}")
         print(f"   ✅ Available providers: {config.get_available_providers()}")
 

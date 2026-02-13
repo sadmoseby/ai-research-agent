@@ -134,12 +134,75 @@ class Config(BaseSettings):
     github_token: Optional[str] = Field(default=None, alias="GITHUB_TOKEN")
     tavily_api_key: Optional[str] = Field(default=None, alias="TAVILY_API_KEY")
 
+    # Proposal parameters
+    idea: Optional[str] = Field(default=None, alias="IDEA")
+    instruments: Optional[str] = Field(default=None, alias="INSTRUMENTS")  # comma-separated
+    alpha_only: bool = Field(default=False, alias="ALPHA_ONLY")
+    slug: Optional[str] = Field(default=None, alias="SLUG")
+    output_dir: str = Field(default="proposals", alias="OUTPUT_DIR")
+    components: Optional[str] = Field(default=None, alias="COMPONENTS")  # comma-separated
+    unified_synthesis: bool = Field(default=False, alias="UNIFIED_SYNTHESIS")
+    branch_name: Optional[str] = Field(default=None, alias="BRANCH_NAME")
+    image_name: Optional[str] = Field(default=None, alias="IMAGE_NAME")
+    upload_to_github: bool = Field(default=False, alias="UPLOAD_TO_GITHUB")
+    github_owner: Optional[str] = Field(default=None, alias="GITHUB_OWNER")
+    github_repository: Optional[str] = Field(default=None, alias="GITHUB_REPOSITORY")
+
+    # Quality control
+    min_viability_score: int = Field(default=51, alias="MIN_VIABILITY_SCORE")
+    max_planning_iterations: int = Field(default=3, alias="MAX_PLANNING_ITERATIONS")
+
+    # Node enable/disable flags
+    # Can be set via environment variables (PLAN_ENABLED, etc.) or config files
+    # Config files take precedence when using from_file() or from_dotenv()
+    plan_enabled: bool = True
+    web_research_enabled: bool = True
+    criticism_enabled: bool = True
+    synthesize_enabled: bool = True
+    validate_enabled: bool = True
+    persist_enabled: bool = True
+    github_issue_enabled: bool = True
+
     # Logging configuration (for initialization)
     log_level: str = Field(default="INFO", alias="LOG_LEVEL")
     enable_node_logging: bool = Field(default=True, alias="ENABLE_NODE_LOGGING")
     enable_graph_logging: bool = Field(default=True, alias="ENABLE_GRAPH_LOGGING")
     log_to_file: bool = Field(default=False, alias="LOG_TO_FILE")
     log_file_path: str = Field(default="research_agent.log", alias="LOG_FILE_PATH")
+
+    # MCP Server Configuration
+    mcp_github_command: str = Field(default="npx", alias="MCP_GITHUB_COMMAND")
+    mcp_github_args: str = Field(default="@modelcontextprotocol/server-github", alias="MCP_GITHUB_ARGS")
+    mcp_github_repo_access: str = Field(default="public", alias="MCP_GITHUB_REPO_ACCESS")
+    mcp_github_timeout: int = Field(default=30, alias="MCP_GITHUB_TIMEOUT")
+    mcp_github_max_retries: int = Field(default=3, alias="MCP_GITHUB_MAX_RETRIES")
+
+    mcp_tavily_command: str = Field(default="npx", alias="MCP_TAVILY_COMMAND")
+    mcp_tavily_args: str = Field(default="@modelcontextprotocol/server-tavily", alias="MCP_TAVILY_ARGS")
+    mcp_tavily_search_depth: str = Field(default="advanced", alias="MCP_TAVILY_SEARCH_DEPTH")
+    mcp_tavily_timeout: int = Field(default=30, alias="MCP_TAVILY_TIMEOUT")
+    mcp_tavily_max_retries: int = Field(default=3, alias="MCP_TAVILY_MAX_RETRIES")
+
+    mcp_filesystem_command: str = Field(default="npx", alias="MCP_FILESYSTEM_COMMAND")
+    mcp_filesystem_args: str = Field(default="@modelcontextprotocol/server-filesystem", alias="MCP_FILESYSTEM_ARGS")
+    mcp_filesystem_allowed_dirs: str = Field(default="/tmp,/workspace", alias="MCP_FILESYSTEM_ALLOWED_DIRS")
+    mcp_filesystem_timeout: int = Field(default=30, alias="MCP_FILESYSTEM_TIMEOUT")
+    mcp_filesystem_max_retries: int = Field(default=3, alias="MCP_FILESYSTEM_MAX_RETRIES")
+
+    # Provider-specific model configuration
+    enable_ollama: bool = Field(default=False, alias="ENABLE_OLLAMA")
+    ollama_model: Optional[str] = Field(default=None, alias="OLLAMA_MODEL")
+    openai_model: str = Field(default="gpt-4o", alias="OPENAI_MODEL")
+    openai_temperature: float = Field(default=0.1, alias="OPENAI_TEMPERATURE")
+    openai_max_tokens: int = Field(default=4000, alias="OPENAI_MAX_TOKENS")
+    anthropic_model: str = Field(default="claude-3-5-sonnet-20241022", alias="ANTHROPIC_MODEL")
+    anthropic_temperature: float = Field(default=0.1, alias="ANTHROPIC_TEMPERATURE")
+    anthropic_max_tokens: int = Field(default=4000, alias="ANTHROPIC_MAX_TOKENS")
+    google_model: str = Field(default="gemini-1.5-pro", alias="GOOGLE_MODEL")
+    google_temperature: float = Field(default=0.1, alias="GOOGLE_TEMPERATURE")
+    google_max_tokens: int = Field(default=4000, alias="GOOGLE_MAX_TOKENS")
+    ollama_temperature: float = Field(default=0.1, alias="OLLAMA_TEMPERATURE")
+    ollama_max_tokens: int = Field(default=4000, alias="OLLAMA_MAX_TOKENS")
 
     # Internal state - these are computed after initialization
     mcp_clients: Dict[str, MCPClientConfig] = Field(default_factory=dict, exclude=True)
@@ -184,9 +247,83 @@ class Config(BaseSettings):
         return self
 
     @classmethod
-    def from_env(cls) -> "Config":
-        """Create config from environment variables (for backward compatibility)."""
-        return cls()
+    def from_dotenv(cls, dotenv_path: str = ".env") -> "Config":
+        """Create config by loading from a .env file.
+
+        Values from the .env file take precedence over existing environment variables.
+        """
+        try:
+            from dotenv import dotenv_values
+        except ImportError:
+            raise ImportError(
+                "python-dotenv is required to load .env files. Install it with: pip install python-dotenv"
+            )
+
+        # Load values from the dotenv file
+        dotenv_config = dotenv_values(dotenv_path)
+
+        # Temporarily override environment with dotenv values
+        original_env = {}
+        for key, value in dotenv_config.items():
+            if key in os.environ:
+                original_env[key] = os.environ[key]
+            if value is not None:
+                os.environ[key] = value
+
+        try:
+            # Create config with dotenv values in environment
+            return cls()
+        finally:
+            # Restore original environment
+            for key in dotenv_config:
+                if key in original_env:
+                    os.environ[key] = original_env[key]
+                elif key in os.environ:
+                    del os.environ[key]
+
+    @classmethod
+    def from_file(cls, config_path: str) -> "Config":
+        """Create config from a JSON or YAML file.
+
+        Values from the config file take precedence over environment variables.
+        """
+        import pathlib
+
+        path = pathlib.Path(config_path)
+        if not path.exists():
+            raise FileNotFoundError(f"Config file not found: {config_path}")
+
+        # Determine file format by extension
+        suffix = path.suffix.lower()
+
+        with open(path, "r") as f:
+            if suffix == ".json":
+                data = json.load(f)
+            elif suffix in [".yaml", ".yml"]:
+                try:
+                    import yaml
+
+                    data = yaml.safe_load(f)
+                except ImportError:
+                    raise ImportError("PyYAML is required for YAML config files. Install it with: pip install pyyaml")
+            else:
+                # Try to auto-detect format
+                content = f.read()
+                # Try JSON first
+                try:
+                    data = json.loads(content)
+                except json.JSONDecodeError:
+                    # Try YAML
+                    try:
+                        import yaml
+
+                        data = yaml.safe_load(content)
+                    except (ImportError, Exception):
+                        raise ValueError(f"Could not parse config file as JSON or YAML: {config_path}")
+
+        # Pass config file data directly to constructor
+        # Pydantic prioritizes constructor arguments over environment variables
+        return cls(**data)
 
     def _load_global_mcp_clients(self) -> None:
         """Load global MCP client configurations."""
@@ -196,36 +333,36 @@ class Config(BaseSettings):
             self.mcp_clients["github"] = MCPClientConfig(
                 name="github",
                 server_type="github",
-                command=os.getenv("MCP_GITHUB_COMMAND", "npx"),
-                args=os.getenv("MCP_GITHUB_ARGS", "@modelcontextprotocol/server-github").split(","),
+                command=self.mcp_github_command,
+                args=self.mcp_github_args.split(","),
                 api_key_env="GITHUB_TOKEN",
-                config_params={"repo_access": os.getenv("MCP_GITHUB_REPO_ACCESS", "public")},
-                timeout=int(os.getenv("MCP_GITHUB_TIMEOUT", "30")),
-                max_retries=int(os.getenv("MCP_GITHUB_MAX_RETRIES", "3")),
+                config_params={"repo_access": self.mcp_github_repo_access},
+                timeout=self.mcp_github_timeout,
+                max_retries=self.mcp_github_max_retries,
             )
 
         if self.tavily_api_key:
             self.mcp_clients["tavily"] = MCPClientConfig(
                 name="tavily",
                 server_type="tavily",
-                command=os.getenv("MCP_TAVILY_COMMAND", "npx"),
-                args=os.getenv("MCP_TAVILY_ARGS", "@modelcontextprotocol/server-tavily").split(","),
+                command=self.mcp_tavily_command,
+                args=self.mcp_tavily_args.split(","),
                 api_key_env="TAVILY_API_KEY",
-                config_params={"search_depth": os.getenv("MCP_TAVILY_SEARCH_DEPTH", "advanced")},
-                timeout=int(os.getenv("MCP_TAVILY_TIMEOUT", "30")),
-                max_retries=int(os.getenv("MCP_TAVILY_MAX_RETRIES", "3")),
+                config_params={"search_depth": self.mcp_tavily_search_depth},
+                timeout=self.mcp_tavily_timeout,
+                max_retries=self.mcp_tavily_max_retries,
             )
 
         # Always add filesystem client (no API key required)
-        allowed_dirs = os.getenv("MCP_FILESYSTEM_ALLOWED_DIRS", "/tmp,/workspace").split(",")
+        allowed_dirs = [d.strip() for d in self.mcp_filesystem_allowed_dirs.split(",")]
         self.mcp_clients["filesystem"] = MCPClientConfig(
             name="filesystem",
             server_type="filesystem",
-            command=os.getenv("MCP_FILESYSTEM_COMMAND", "npx"),
-            args=os.getenv("MCP_FILESYSTEM_ARGS", "@modelcontextprotocol/server-filesystem").split(","),
-            config_params={"allowed_directories": [d.strip() for d in allowed_dirs]},
-            timeout=int(os.getenv("MCP_FILESYSTEM_TIMEOUT", "30")),
-            max_retries=int(os.getenv("MCP_FILESYSTEM_MAX_RETRIES", "3")),
+            command=self.mcp_filesystem_command,
+            args=self.mcp_filesystem_args.split(","),
+            config_params={"allowed_directories": allowed_dirs},
+            timeout=self.mcp_filesystem_timeout,
+            max_retries=self.mcp_filesystem_max_retries,
         )
 
     def _load_node_configs(self) -> None:
@@ -274,54 +411,52 @@ class Config(BaseSettings):
         return node_config
 
     def _load_node_llm_config(self, node_name: str) -> Optional[LLMProviderConfig]:
-        """Load node-specific LLM configuration."""
-        env_prefix = node_name.upper()
+        """Load node-specific LLM configuration.
 
-        # Get node-specific values from environment
-        provider = os.getenv(f"{env_prefix}_LLM_PROVIDER")
-        model = os.getenv(f"{env_prefix}_LLM_MODEL")
-        temperature = os.getenv(f"{env_prefix}_LLM_TEMPERATURE")
-        max_tokens = os.getenv(f"{env_prefix}_LLM_MAX_TOKENS")
-
-        # If no node-specific config, return None to use default
-        if not any([provider, model, temperature, max_tokens]):
-            return None
-
-        # Use provided values or fall back to main config values
-        effective_provider = provider or self.default_llm_provider
-
-        result = LLMProviderConfig(
-            provider=effective_provider,
-            api_key_env=f"{effective_provider.upper()}_API_KEY",
-            model=model or self.model,
-            base_url=os.getenv(f"{env_prefix}_LLM_BASE_URL"),
-            temperature=float(temperature) if temperature else self.temperature,
-            max_tokens=int(max_tokens) if max_tokens else self.max_tokens,
-        )
-        return result
+        Note: This is deprecated. Per-node LLM settings should be configured
+        through the NodeConfig in node_configs, not environment variables.
+        """
+        # No longer read from environment variables
+        return None
 
     def _get_node_mcp_tools_list(self, node_name: str) -> List[str]:
-        """Get MCP tools list for a specific node."""
-        env_prefix = node_name.upper()
-        tools_str = os.getenv(f"{env_prefix}_MCP_TOOLS")
-        if tools_str:
-            return [tool.strip() for tool in tools_str.split(",") if tool.strip()]
+        """Get MCP tools list for a specific node.
+
+        Note: This is deprecated. Per-node MCP tool settings should be configured
+        through the NodeConfig in node_configs, not environment variables.
+        """
+        # No longer read from environment variables
         return []
 
     def _get_node_mcp_enabled(self, node_name: str) -> Optional[bool]:
-        """Get MCP enabled setting for a specific node."""
-        env_prefix = node_name.upper()
-        use_mcp_env = os.getenv(f"{env_prefix}_USE_MCP")
-        if use_mcp_env is not None:
-            return use_mcp_env.lower() == "true"
+        """Get MCP enabled setting for a specific node.
+
+        Note: This is deprecated. Per-node MCP settings should be configured
+        through the NodeConfig in node_configs, not environment variables.
+        """
+        # No longer read from environment variables
         return None
 
     def _get_node_enabled(self, node_name: str) -> Optional[bool]:
-        """Get enabled setting for a specific node."""
-        env_prefix = node_name.upper()
-        enabled_env = os.getenv(f"{env_prefix}_ENABLED")
-        if enabled_env is not None:
-            return enabled_env.lower() == "true"
+        """Get enabled setting for a specific node from config fields only."""
+        # Map node names to config field names
+        field_map = {
+            "plan": "plan_enabled",
+            "web_research": "web_research_enabled",
+            "criticism": "criticism_enabled",
+            "synthesize": "synthesize_enabled",
+            "validate": "validate_enabled",
+            "persist": "persist_enabled",
+            "github_issue": "github_issue_enabled",
+        }
+
+        # Return the config field value if it exists
+        if node_name in field_map:
+            field_name = field_map[node_name]
+            if hasattr(self, field_name):
+                return getattr(self, field_name)
+
+        # Return None to use default behavior (enabled)
         return None
 
     def get_global_mcp_clients(self) -> Dict[str, MCPClientConfig]:
@@ -440,13 +575,13 @@ class Config(BaseSettings):
     def get_available_providers(self) -> List[str]:
         """Get list of available LLM providers based on API keys."""
         providers = []
-        if os.getenv("OPENAI_API_KEY"):
+        if self.openai_api_key:
             providers.append("openai")
-        if os.getenv("ANTHROPIC_API_KEY"):
+        if self.anthropic_api_key:
             providers.append("anthropic")
-        if os.getenv("GOOGLE_API_KEY"):
+        if self.google_api_key:
             providers.append("gemini")
-        if os.getenv("OLLAMA_MODEL") or os.getenv("ENABLE_OLLAMA", "false").lower() == "true":
+        if self.ollama_model or self.enable_ollama:
             providers.append("ollama")
         return providers
 
@@ -471,30 +606,30 @@ class Config(BaseSettings):
             "openai": LLMProviderConfig(
                 provider="openai",
                 api_key_env="OPENAI_API_KEY",
-                model=os.getenv("OPENAI_MODEL", "gpt-4o"),
-                temperature=float(os.getenv("OPENAI_TEMPERATURE", "0.1")),
-                max_tokens=int(os.getenv("OPENAI_MAX_TOKENS", "4000")),
+                model=self.openai_model,
+                temperature=self.openai_temperature,
+                max_tokens=self.openai_max_tokens,
             ),
             "anthropic": LLMProviderConfig(
                 provider="anthropic",
                 api_key_env="ANTHROPIC_API_KEY",
-                model=os.getenv("ANTHROPIC_MODEL", "claude-3-5-sonnet-20241022"),
-                temperature=float(os.getenv("ANTHROPIC_TEMPERATURE", "0.1")),
-                max_tokens=int(os.getenv("ANTHROPIC_MAX_TOKENS", "4000")),
+                model=self.anthropic_model,
+                temperature=self.anthropic_temperature,
+                max_tokens=self.anthropic_max_tokens,
             ),
             "gemini": LLMProviderConfig(
                 provider="gemini",
                 api_key_env="GOOGLE_API_KEY",
-                model=os.getenv("GOOGLE_MODEL", "gemini-1.5-pro"),
-                temperature=float(os.getenv("GOOGLE_TEMPERATURE", "0.1")),
-                max_tokens=int(os.getenv("GOOGLE_MAX_TOKENS", "4000")),
+                model=self.google_model,
+                temperature=self.google_temperature,
+                max_tokens=self.google_max_tokens,
             ),
             "ollama": LLMProviderConfig(
                 provider="ollama",
                 api_key_env="OLLAMA_API_KEY",  # Placeholder, not actually used
-                model=os.getenv("OLLAMA_MODEL", "llama3.2:3b"),
-                temperature=float(os.getenv("OLLAMA_TEMPERATURE", "0.1")),
-                max_tokens=int(os.getenv("OLLAMA_MAX_TOKENS", "4000")),
+                model=self.ollama_model or "llama3.2:3b",
+                temperature=self.ollama_temperature,
+                max_tokens=self.ollama_max_tokens,
             ),
         }
 
@@ -554,16 +689,17 @@ class Config(BaseSettings):
             "criticism",
             "synthesize",
             "persist",
+            "github_issue",
         ]
 
     # --- Components helpers ---
-    def get_components_from_env(self) -> Optional[int]:
-        """Parse COMPONENTS env var into a ResearchComponents bitmask.
+    def get_components_from_config(self) -> Optional[int]:
+        """Parse COMPONENTS config field into a ResearchComponents bitmask.
 
         Examples:
           COMPONENTS="UNIVERSE,ALPHA" -> UNIVERSE | ALPHA
         """
-        raw = os.getenv("COMPONENTS")
+        raw = self.components
         if not raw:
             return None
 
@@ -591,9 +727,28 @@ class Config(BaseSettings):
 
     def is_node_enabled(self, node_name: str) -> bool:
         """Check if a node is enabled. Returns True by default if not explicitly disabled."""
+        # Map node names to config field names
+        field_map = {
+            "plan": "plan_enabled",
+            "web_research": "web_research_enabled",
+            "criticism": "criticism_enabled",
+            "synthesize": "synthesize_enabled",
+            "validate": "validate_enabled",
+            "persist": "persist_enabled",
+            "github_issue": "github_issue_enabled",
+        }
+
+        # Check config field directly
+        if node_name in field_map:
+            field_name = field_map[node_name]
+            if hasattr(self, field_name):
+                return getattr(self, field_name)
+
+        # Fallback: check node_configs for backward compatibility
         node_config = self.node_configs.get(node_name)
         if node_config and node_config.enabled is not None:
             return node_config.enabled
+
         return True  # Default to enabled
 
     def get_enabled_nodes(self) -> list[str]:
@@ -617,11 +772,6 @@ class Config(BaseSettings):
 
         clean_json = "\n".join(lines)
         return json.loads(clean_json)
-
-    def get_boolean_env(self, env_var: str, default: bool = False) -> bool:
-        """Get a boolean environment variable with proper parsing."""
-        value = os.environ.get(env_var, str(default)).lower()
-        return value in ("true", "1", "yes", "on")
 
     def setup_logging(self):
         """Setup logging configuration based on the logging config."""

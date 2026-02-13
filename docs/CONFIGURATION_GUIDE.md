@@ -97,13 +97,12 @@ SYNTHESIZE_MAX_TOKENS="6000"        # Adequate for proposal generation
 
 ```bash
 # Per-node MCP tool access
-PLAN_MCP_TOOLS="filesystem"
-WEB_RESEARCH_MCP_TOOLS="web_search,tavily"
-PRIOR_ART_MCP_TOOLS="github,filesystem"
-CRITICISM_MCP_TOOLS=""              # No specific tools needed
-SYNTHESIZE_MCP_TOOLS="web_search"   # For structured outputs
-VALIDATE_MCP_TOOLS=""               # Uses jsonschema directly
-PERSIST_MCP_TOOLS="filesystem"
+# Per-Node tool configuration (OpenAI Responses API with web search)
+WEB_RESEARCH_TOOLS="web_search"    # OpenAI web search capability
+CRITICISM_TOOLS=""                 # No specific tools needed
+SYNTHESIZE_TOOLS="web_search"      # For structured outputs
+PERSIST_TOOLS="filesystem"         # File system operations
+GITHUB_ISSUE_TOOLS="gh_cli"        # GitHub CLI for issue creation
 ```
 
 ## Node Enable/Disable Configuration
@@ -114,11 +113,10 @@ PERSIST_MCP_TOOLS="filesystem"
 # Disable specific nodes (all enabled by default)
 PLAN_ENABLED=true
 WEB_RESEARCH_ENABLED=true
-PRIOR_ART_ENABLED=false             # Skip GitHub integration
 CRITICISM_ENABLED=false             # Skip quality checks for speed
-SYNTHESIZE_ENABLED=true             # Always keep enabled
-VALIDATE_ENABLED=true               # Always keep enabled
-PERSIST_ENABLED=true                # Always keep enabled
+SYNTHESIZE_ENABLED=true             # Core synthesis - keep enabled
+PERSIST_ENABLED=true                # File persistence - keep enabled
+GITHUB_ISSUE_ENABLED=false          # Optional GitHub integration
 ```
 
 ### Configuration Patterns
@@ -126,7 +124,6 @@ PERSIST_ENABLED=true                # Always keep enabled
 #### Fast Prototyping Mode
 ```bash
 CRITICISM_ENABLED=false
-PRIOR_ART_ENABLED=false
 WEB_RESEARCH_MAX_TOKENS=2000
 ```
 
@@ -139,7 +136,6 @@ CRITICISM_TEMPERATURE=0.9
 
 #### Debug Mode
 ```bash
-PRIOR_ART_ENABLED=false             # Skip if GitHub issues
 LOG_LEVEL=DEBUG
 LOG_TO_FILE=true
 ```
@@ -179,11 +175,7 @@ DISABLE_PROVIDER_LOGGING=false
 # Criticism scoring thresholds
 MIN_VIABILITY_SCORE=51              # Minimum score to proceed
 MAX_PLANNING_ITERATIONS=3           # Maximum restart attempts
-
-# Prior art checking
-PRIOR_ART_THRESHOLD=3               # Number of findings that trigger restart
-ENABLE_PRIOR_ART_RESTART=true
-ENABLE_CRITICISM_RESTART=true
+ENABLE_CRITICISM_RESTART=true       # Allow criticism-based restarts
 ```
 
 ### Alpha-Only Mode Configuration
@@ -241,8 +233,7 @@ config = Config.from_env()
 ```bash
 # Core API Keys
 OPENAI_API_KEY=sk-your-openai-key
-GITHUB_TOKEN=ghp_your-github-token
-TAVILY_API_KEY=tvly-your-tavily-key
+GITHUB_TOKEN=ghp_your-github-token  # Optional, for issue creation
 ANTHROPIC_API_KEY=sk-ant-your-anthropic-key
 
 # Provider Configuration
@@ -252,8 +243,13 @@ CRITICISM_PROVIDER=anthropic
 
 # Node Configuration
 CRITICISM_ENABLED=true
-PRIOR_ART_ENABLED=true
+GITHUB_ISSUE_ENABLED=false
 WEB_RESEARCH_MAX_TOKENS=6000
+
+# GitHub Integration (optional)
+UPLOAD_TO_GITHUB=false
+GITHUB_OWNER=your-org
+GITHUB_REPOSITORY=your-repo
 
 # Logging
 LOG_LEVEL=INFO
@@ -306,9 +302,10 @@ python -c "from agent.tools.mcp_client import MCPClient; from agent.config impor
 
 ### Production
 - Use environment variables, not `.env` files
-- Enable all quality nodes (criticism, prior_art)
+- Enable all quality nodes (criticism)
 - Configure appropriate logging levels
 - Set up log rotation for file logging
+- Configure GitHub integration if needed
 
 ### Performance
 - Use faster models for less critical nodes

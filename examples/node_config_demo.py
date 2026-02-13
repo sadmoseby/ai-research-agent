@@ -19,44 +19,40 @@ The research agent now supports turning individual nodes on and off via environm
 
    Examples:
    export CRITICISM_ENABLED=false     # Disable criticism node
-   export PRIOR_ART_ENABLED=false     # Disable prior art check
+   export GITHUB_ISSUE_ENABLED=false  # Disable GitHub issue creation
    export WEB_RESEARCH_ENABLED=true   # Explicitly enable web research
 
 2. Supported Node Names:
    - PLAN_ENABLED
    - WEB_RESEARCH_ENABLED
-   - PRIOR_ART_ENABLED
    - CRITICISM_ENABLED
    - SYNTHESIZE_ENABLED
-   - VALIDATE_ENABLED
    - PERSIST_ENABLED
+   - GITHUB_ISSUE_ENABLED
 
 🚀 Usage Examples:
 
-# Run with criticism and prior art disabled
+# Run with criticism disabled for speed
 export CRITICISM_ENABLED=false
-export PRIOR_ART_ENABLED=false
-python cli.py propose --idea "momentum trading strategy"
+python main.py propose --idea "momentum trading strategy"
 
-# Run with only core synthesis and validation
+# Run with only core synthesis
 export PLAN_ENABLED=false
 export WEB_RESEARCH_ENABLED=false
-export PRIOR_ART_ENABLED=false
 export CRITICISM_ENABLED=false
-python cli.py propose --idea "mean reversion strategy"
+python main.py propose --idea "mean reversion strategy"
 
 # Run with full pipeline (default)
-python cli.py propose --idea "pairs trading strategy"
+python main.py propose --idea "pairs trading strategy"
 
 📋 Node Descriptions:
 
 • plan: Initial research planning and strategy formation
-• web_research: Gather information from web sources
-• prior_art: Check GitHub for existing implementations
+• web_research: Comprehensive web research using OpenAI
 • criticism: Critical analysis and feedback loop
-• synthesize: Generate the research proposal JSON
-• validate: Validate against the schema
+• synthesize: Generate and validate the research proposal JSON
 • persist: Save the final proposal to disk
+• github_issue: Create GitHub issue from proposal (optional)
 
 ⚠️  Important Notes:
 
@@ -67,8 +63,8 @@ python cli.py propose --idea "pairs trading strategy"
 
 🎯 Use Cases:
 
-• Fast prototyping: Disable criticism and prior_art
-• Core synthesis only: Disable plan, web_research, prior_art, criticism
+• Fast prototyping: Disable criticism
+• Core synthesis only: Disable plan, web_research, criticism
 • Research-heavy: Keep all nodes enabled (default)
 • Debug/testing: Disable individual nodes to isolate issues
 

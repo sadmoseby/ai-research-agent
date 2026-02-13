@@ -16,7 +16,6 @@ def main():
     os.environ["SYNTHESIZE_MODEL"] = "gpt-4o-mini"  # Use cheaper model for synthesis
     os.environ["CRITICISM_TEMPERATURE"] = "0.9"  # Higher creativity for criticism
     os.environ["WEB_RESEARCH_MAX_TOKENS"] = "8000"  # More tokens for web research
-    os.environ["VALIDATE_USE_MCP"] = "false"  # Disable MCP for validation
 
     # Create config from environment
     config = Config.from_env()

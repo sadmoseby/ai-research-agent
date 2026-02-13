@@ -14,16 +14,10 @@ def main():
     # Set some example environment variables
     os.environ["OPENAI_API_KEY"] = "fake-key-for-demo"
     os.environ["GITHUB_TOKEN"] = "fake-github-token"
-    os.environ["TAVILY_API_KEY"] = "fake-tavily-token"
 
     # Configure specific MCP tools for different nodes
-    os.environ["WEB_RESEARCH_MCP_TOOLS"] = "tavily,github"
-    os.environ["SYNTHESIZE_MCP_TOOLS"] = "tavily"
-    os.environ["PRIOR_ART_MCP_TOOLS"] = "github"
-
-    # Override global MCP client settings
-    os.environ["MCP_TAVILY_TIMEOUT"] = "60"
-    os.environ["MCP_TAVILY_CONFIG"] = '{"search_depth": "deep", "include_raw_content": true}'
+    os.environ["WEB_RESEARCH_MCP_TOOLS"] = "web_search"
+    os.environ["SYNTHESIZE_MCP_TOOLS"] = "validation"
 
     # Create config from environment
     config = Config.from_env()
@@ -40,7 +34,7 @@ def main():
     print("=== Node MCP Tool Access ===")
 
     # Show node-specific MCP tool access
-    for node_name in ["web_research", "synthesize", "prior_art", "plan"]:
+    for node_name in ["web_research", "synthesize", "criticism", "plan"]:
         mcp_tools = config.get_node_mcp_tools(node_name)
         mcp_clients = config.get_node_mcp_clients(node_name)
 
@@ -96,8 +90,10 @@ def main():
 
     # Demonstrate removing access
     print("=== Removing Tool Access ===")
-    removed = config.remove_mcp_tool_from_node("web_research", "tavily")
-    print(f"Removed 'tavily' from web_research: {removed}")
+    # Note: In current architecture, web search is handled via OpenAI Responses API
+    # MCP tools are primarily used for validation and filesystem operations
+    print("\nMCP tools are now primarily used for validation and local operations")
+    print("Web search is handled directly via OpenAI Responses API")
 
     updated_tools = config.get_node_mcp_tools("web_research")
     print(f"Updated web_research tools: {updated_tools}")

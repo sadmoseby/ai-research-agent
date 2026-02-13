@@ -31,7 +31,7 @@ async def web_research_node(state: ResearchState, config: Config) -> Dict[str, A
     research_plan = state.get("research_plan", "")
     alpha_only = state.get("alpha_only", False)
     instruments = state.get("instruments", [])
-    components_flag = state.get("components") or config.get_components_from_env()
+    components_flag = state.get("components") or config.get_components_from_config()
 
     logger.info("Conducting component-specific research for idea: %s", idea)
     logger.debug("Web research node has access to tools: %s", available_tools)
@@ -167,9 +167,9 @@ async def _conduct_component_research(
     try:
         # Get component-specific prompts
         system_prompt = ResearchPrompts.COMPONENT_RESEARCH_SYSTEM_PROMPTS[component].format(
-            available_tools=available_tools, 
+            available_tools=available_tools,
             instruments=", ".join(instruments),
-            alpha_only="Yes" if alpha_only else "No"
+            alpha_only="Yes" if alpha_only else "No",
         )
 
         user_prompt = ResearchPrompts.COMPONENT_RESEARCH_USER_PROMPTS[component].format(

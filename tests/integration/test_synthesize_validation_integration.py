@@ -8,6 +8,8 @@ import os
 import tempfile
 from pathlib import Path
 
+import pytest
+
 # Set testing environment
 os.environ["TESTING"] = "true"
 os.environ["OPENAI_API_KEY"] = "test-key-for-testing"
@@ -21,6 +23,7 @@ from agent.nodes.synthesize import synthesize_node
 from agent.state import ResearchState
 
 
+@pytest.mark.requires_api
 async def test_synthesize_with_validation():
     """Test that synthesize node includes validation functionality."""
 
@@ -38,7 +41,7 @@ async def test_synthesize_with_validation():
         print("Testing synthesize node with integrated validation...")
 
         # Create config from environment
-        config = Config.from_env()
+        config = Config()
 
         result = await synthesize_node(state, config)
 

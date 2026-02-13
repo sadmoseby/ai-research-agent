@@ -41,7 +41,7 @@ async def demo_comprehensive_web_research():
 
     print("\n=== New Comprehensive Research Approach ===")
     print("✓ Single comprehensive LLM-based research session")
-    print("✓ Uses MCP client web_search with use_tavily=False for " "LLM-only search")
+    print("✓ Uses OpenAI Responses API with native web search tool")
     print("✓ Expands original idea into verbose detailed proposal")
     print("✓ Suitable for later JSON schema conversion")
 
@@ -59,10 +59,10 @@ async def demo_comprehensive_web_research():
 
     # Show the structure of what would happen
     print("\n=== Research Flow ===")
-    print("1. Initialize LLM client with web search capabilities")
-    print("2. Create comprehensive system prompt with available tools")
+    print("1. Initialize LLM client with OpenAI Responses API")
+    print("2. Create comprehensive system prompt")
     print("3. Generate detailed user prompt with idea + context")
-    print("4. Use MCP client web_search with use_tavily=False for " "LLM-based search")
+    print("4. Use OpenAI's native web search tool for research")
     print("5. Return single comprehensive research document")
 
     print("\n=== Expected Output Structure ===")
@@ -85,9 +85,9 @@ async def demo_comprehensive_web_research():
         print(f"\nNote: Full execution requires proper LLM and MCP setup: {e}")
 
     print("\n=== Summary ===")
-    print("✓ Modified web_research_node for single comprehensive research")
-    print("✓ Added new comprehensive research prompts")
-    print("✓ Uses MCP client web_search with use_tavily=False for LLM-only behavior")
+    print("✓ Modified web_research_node for comprehensive research")
+    print("✓ Added comprehensive research prompts")
+    print("✓ Uses OpenAI Responses API with native web search")
     print("✓ Generates detailed proposals suitable for JSON conversion")
 
 

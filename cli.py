@@ -4,8 +4,17 @@ CLI entry point for the Lean Research Agent.
 """
 import argparse
 import asyncio
+import json
 import sys
 from pathlib import Path
+from typing import Optional
+
+try:
+    import yaml
+
+    YAML_AVAILABLE = True
+except ImportError:
+    YAML_AVAILABLE = False
 
 # Add current directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent))
@@ -38,22 +47,21 @@ def parse_instruments(instruments_str: str) -> list[str]:
 def parse_components(components_str: str) -> int:
     """Parse a comma-separated string of components into a ResearchComponents bitmask."""
     from agent.state import ResearchComponents
-    
+
     valid_components = {"universe", "alpha", "portfolio", "execution", "risk"}
-    
+
     if not components_str:
         raise ValueError("Components cannot be empty")
-    
+
     components = [comp.strip().lower() for comp in components_str.split(",")]
-    
+
     # Validate each component
     invalid_components = [comp for comp in components if comp not in valid_components]
     if invalid_components:
         raise ValueError(
-            f"Invalid components: {invalid_components}. "
-            f"Valid options are: {', '.join(sorted(valid_components))}"
+            f"Invalid components: {invalid_components}. " f"Valid options are: {', '.join(sorted(valid_components))}"
         )
-    
+
     # Map to bitmask
     mapping = {
         "universe": ResearchComponents.UNIVERSE,
@@ -62,11 +70,11 @@ def parse_components(components_str: str) -> int:
         "execution": ResearchComponents.EXECUTION,
         "risk": ResearchComponents.RISK,
     }
-    
+
     bitmask = 0
     for comp in components:
         bitmask |= int(mapping[comp])
-    
+
     return bitmask
 
 
@@ -83,47 +91,66 @@ def create_slug(idea_text: str) -> str:
 async def propose_command(args):
     """Execute the propose command."""
     try:
-        # Default to component-by-component synthesis for CLI usage
-        # This can be overridden with --unified-synthesis flag
-        import os
-
-        if args.unified_synthesis:
-            os.environ["SYNTHESIZE_COMPONENT_BY_COMPONENT"] = "false"
+        # Load config from file if provided, otherwise from .env
+        if args.config:
+            print(f"📄 Loading configuration from: {args.config}")
+            config = Config.from_file(args.config)
+            print(f"✅ Configuration loaded from file")
         else:
-            # Always default to component-by-component when using CLI
-            os.environ["SYNTHESIZE_COMPONENT_BY_COMPONENT"] = "true"
+            print(f"📄 Loading configuration from .env file")
+            config = Config.from_dotenv()
+            print(f"✅ Configuration loaded from .env")
 
-        config = Config.from_env()
+        # Validate required parameters from config
+        if not config.idea:
+            raise ValueError("'idea' is required in config file or .env (IDEA=...)")
+        if not config.instruments:
+            raise ValueError("'instruments' is required in config file or .env (INSTRUMENTS=...)")
 
         # Setup logging
         config.setup_logging()
 
+        # Set synthesis mode based on config
+        import os
+        if config.unified_synthesis:
+            os.environ["SYNTHESIZE_COMPONENT_BY_COMPONENT"] = "false"
+        else:
+            # Default to component-by-component
+            os.environ["SYNTHESIZE_COMPONENT_BY_COMPONENT"] = "true"
+
         graph = create_research_graph(config)
 
-        slug = args.slug or create_slug(args.idea)
-        instruments = parse_instruments(args.instruments)
-        
+        slug = config.slug or create_slug(config.idea)
+        instruments = parse_instruments(config.instruments)
+
         # Parse components if provided
         components = None
-        if args.components:
-            components = parse_components(args.components)
+        if config.components:
+            components = parse_components(config.components)
 
         initial_state = ResearchState(
-            idea=args.idea,
-            alpha_only=args.alpha_only,
+            idea=config.idea,
+            alpha_only=config.alpha_only,
             instruments=instruments,
             components=components,
             slug=slug,
+            output_dir=config.output_dir,
+            branch_name=config.branch_name,
+            image_name=config.image_name,
+            upload_to_github=config.upload_to_github,
+            github_owner=config.github_owner,
+            github_repository=config.github_repository,
             current_step="plan",
             should_restart_planning=False,
             planning_iteration=0,
             repair_attempts=0,
         )
 
-        print(f"🔬 Starting research for: {args.idea}")
+        print(f"🔬 Starting research for: {config.idea}")
         print(f"🎯 Trading instruments: {', '.join(instruments)}")
         if components:
             from agent.state import ResearchComponents
+
             component_names = []
             if components & ResearchComponents.UNIVERSE:
                 component_names.append("UNIVERSE")
@@ -136,7 +163,8 @@ async def propose_command(args):
             if components & ResearchComponents.RISK:
                 component_names.append("RISK")
             print(f"🧩 Research components: {', '.join(component_names)}")
-        print(f"📁 Will write to: proposals/{slug}.json")
+        output_path = Path(config.output_dir) / f"{slug}.json"
+        print(f"📁 Will write to: {output_path}")
 
         # Show synthesis mode
         synthesis_mode = (
@@ -144,8 +172,8 @@ async def propose_command(args):
             if os.environ.get("SYNTHESIZE_COMPONENT_BY_COMPONENT", "false").lower() == "true"
             else "unified"
         )
-        print(f"⚙️  Synthesis mode: {synthesis_mode} (CLI default)")
-        if args.alpha_only:
+        print(f"⚙️  Synthesis mode: {synthesis_mode}")
+        if config.alpha_only:
             print("🎯 Alpha-only mode: will use unified synthesis regardless of setting")
 
         # Run the graph
@@ -165,6 +193,8 @@ async def propose_command(args):
                 print(f"📊 Final state written to: {final_state['state_path']}")
             if final_state.get("validation_report"):
                 print(f"📋 Validation: {final_state['validation_report']}")
+            if final_state.get("github_issue_url"):
+                print(f"🐙 GitHub issue: {final_state['github_issue_url']}")
         else:
             print("❌ Unknown error occurred")
             sys.exit(1)
@@ -179,23 +209,13 @@ def main():
     subparsers = parser.add_subparsers(dest="command", help="Available commands")
 
     # Propose command
-    propose_parser = subparsers.add_parser("propose", help="Generate a research proposal")
-    propose_parser.add_argument("--idea", required=True, help="Research idea (free text)")
-    propose_parser.add_argument(
-        "--instruments",
-        required=True,
-        help="Financial instruments to trade (comma-separated): stocks, options, futures, forex, crypto",
-    )
-    propose_parser.add_argument("--alpha-only", action="store_true", help="Generate alpha-only proposal")
-    propose_parser.add_argument("--slug", help="Custom slug for output filename")
-    propose_parser.add_argument(
-        "--components",
-        help="Research components to focus on (comma-separated): universe, alpha, portfolio, execution, risk"
+    propose_parser = subparsers.add_parser(
+        "propose", 
+        help="Generate a research proposal (all parameters from config file or .env)"
     )
     propose_parser.add_argument(
-        "--unified-synthesis",
-        action="store_true",
-        help="Use unified synthesis instead of component-by-component synthesis (CLI defaults to component-by-component)",
+        "--config",
+        help="Path to JSON or YAML config file. If not provided, loads from .env file.",
     )
 
     args = parser.parse_args()

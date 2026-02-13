@@ -16,6 +16,29 @@ from ..tools.mcp_client import MCPClient
 logger = get_logger("nodes.persist")
 
 
+def _generate_issue_markdown(proposal: Dict[str, Any], branch_name: str = "", image_name: str = "") -> str:
+    """Generate GitHub issue markdown from research proposal."""
+    # Convert proposal dict to formatted JSON string
+    proposal_json = json.dumps(proposal, indent=2, ensure_ascii=False)
+
+    # Create issue template
+    issue_template = f"""# Meta-Information
+* BEFORE creating the pull-request that implements this proposal, FIRST create a new branch from the base branch + commit. The pull-request should be merged into this branch
+* Please move the research-proposal into the research/r/live directory before actually implementing it.
+
+# Branch Information
+BranchName: {branch_name}
+ImageName: {image_name}
+
+
+# Research Proposal Details
+```
+{proposal_json}
+```
+"""
+    return issue_template
+
+
 async def persist_node(state: ResearchState, config: Config) -> Dict[str, Any]:
     """Persist the research proposal to various outputs using MCP."""
     logger.info("Starting persistence node execution")
@@ -56,13 +79,17 @@ async def persist_node(state: ResearchState, config: Config) -> Dict[str, Any]:
             }
 
     try:
-        # Ensure proposals directory exists
-        proposals_dir = Path("proposals")
-        proposals_dir.mkdir(exist_ok=True)
+        # Get output directory from state, default to 'proposals'
+        output_dir = state.get("output_dir", "proposals")
+        output_path = Path(output_dir)
+
+        # Ensure output directory exists
+        output_path.mkdir(parents=True, exist_ok=True)
+        logger.info("Using output directory: %s", output_path)
 
         # Create output paths
-        proposal_output_path = proposals_dir / f"{slug}.json"
-        state_output_path = proposals_dir / f"{slug}_state.json"
+        proposal_output_path = output_path / f"{slug}.json"
+        state_output_path = output_path / f"{slug}_state.json"
 
         # Save the proposal (could use filesystem MCP tool if available)
         if mcp_client.has_tool("filesystem"):
@@ -83,12 +110,22 @@ async def persist_node(state: ResearchState, config: Config) -> Dict[str, Any]:
         with open(state_output_path, "w", encoding="utf-8") as f:
             json.dump(filtered_state, f, indent=2, ensure_ascii=False, default=str)
 
+        # Generate issue.md file for GitHub issue creation
+        issue_output_path = output_path / "issue.md"
+        branch_name = state.get("branch_name", "")
+        image_name = state.get("image_name", "")
+        issue_content = _generate_issue_markdown(final_proposal, branch_name, image_name)
+        with open(issue_output_path, "w", encoding="utf-8") as f:
+            f.write(issue_content)
+
         logger.info("Successfully saved proposal to: %s", proposal_output_path)
         logger.info("Successfully saved final state to: %s", state_output_path)
+        logger.info("Successfully saved GitHub issue template to: %s", issue_output_path)
 
         return {
             "proposal_path": str(proposal_output_path),
             "state_path": str(state_output_path),
+            "issue_path": str(issue_output_path),
             "validation_report": validation_report,
             "mcp_tools_available": available_tools,
             "error": None,

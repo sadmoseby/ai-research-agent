@@ -11,7 +11,7 @@ Control individual nodes using environment variables with the pattern `{NODE_NAM
 ```bash
 # Disable specific nodes
 export CRITICISM_ENABLED=false
-export PRIOR_ART_ENABLED=false
+export GITHUB_ISSUE_ENABLED=false
 
 # Explicitly enable nodes (optional, enabled by default)
 export WEB_RESEARCH_ENABLED=true
@@ -20,48 +20,45 @@ export WEB_RESEARCH_ENABLED=true
 ### Supported Node Names
 
 - `PLAN_ENABLED` - Initial research planning and strategy formation
-- `WEB_RESEARCH_ENABLED` - Gather information from web sources
-- `PRIOR_ART_ENABLED` - Check GitHub for existing implementations
-- `CRITICISM_ENABLED` - Critical analysis and feedback loop
-- `SYNTHESIZE_ENABLED` - Generate the research proposal JSON
-- `VALIDATE_ENABLED` - Validate against the schema
+- `WEB_RESEARCH_ENABLED` - Gather information from web using OpenAI Responses API
+- `CRITICISM_ENABLED` - Critical analysis and quality feedback loop
+- `SYNTHESIZE_ENABLED` - Generate the research proposal JSON with validation
 - `PERSIST_ENABLED` - Save the final proposal to disk
+- `GITHUB_ISSUE_ENABLED` - Create GitHub issue with proposal (requires gh CLI)
 
 ## Usage Examples
 
 ### Fast Prototyping
-Disable criticism and prior art checks for faster iteration:
+Disable criticism for faster iteration:
 
 ```bash
 export CRITICISM_ENABLED=false
-export PRIOR_ART_ENABLED=false
-python cli.py propose --idea "momentum trading strategy"
+python main.py propose --idea "momentum trading strategy"
 ```
 
 ### Core Synthesis Only
-Run only the essential synthesis and validation steps:
+Run only the essential synthesis and persistence steps:
 
 ```bash
 export PLAN_ENABLED=false
 export WEB_RESEARCH_ENABLED=false
-export PRIOR_ART_ENABLED=false
 export CRITICISM_ENABLED=false
-python cli.py propose --idea "mean reversion strategy"
+python main.py propose --idea "mean reversion strategy"
 ```
 
 ### Full Pipeline (Default)
 All nodes enabled for comprehensive research:
 
 ```bash
-python cli.py propose --idea "pairs trading strategy"
+python main.py propose --idea "pairs trading strategy"
 ```
 
 ### Debug/Testing
 Disable specific nodes to isolate issues:
 
 ```bash
-export PRIOR_ART_ENABLED=false  # Skip GitHub integration issues
-python cli.py propose --idea "test strategy"
+export GITHUB_ISSUE_ENABLED=false  # Skip GitHub integration
+python main.py propose --idea "test strategy"
 ```
 
 ## Node Flow and Dependencies
@@ -69,7 +66,7 @@ python cli.py propose --idea "test strategy"
 The nodes execute in the following sequence when enabled:
 
 ```
-START → plan → web_research → prior_art → criticism → synthesize → validate → persist → END
+START → plan → web_research → criticism → synthesize → persist → github_issue → END
 ```
 
 ### Bypass Logic
@@ -78,16 +75,15 @@ When nodes are disabled, the workflow automatically routes around them:
 
 - **Disabled nodes are skipped** entirely from the graph
 - **Routing functions** automatically find the next enabled node
-- **Restart logic** (from criticism/prior_art) respects node enablement
-- **Validation repair** only routes to synthesize if it's enabled
+- **Restart logic** (from criticism) respects node enablement
 
 ### Special Routing
 
 Some nodes have special routing logic that's preserved:
 
-- **prior_art** → can restart planning or continue to criticism/synthesize
 - **criticism** → can restart planning or continue to synthesize
-- **validate** → can repair via synthesize or continue to persist
+- **synthesize** → includes built-in validation with automatic retry
+- **persist** → conditionally routes to github_issue if enabled
 
 ## Programmatic Usage
 
@@ -129,8 +125,8 @@ all_nodes = config.get_all_node_names()
 
 ### Resource Management
 - **Reduce API calls** by disabling web research
-- **Skip expensive operations** like GitHub prior art search
-- **Minimize LLM calls** by disabling criticism loops
+- **Skip expensive operations** like criticism loops
+- **Minimize LLM calls** for faster execution
 
 ## Error Handling
 

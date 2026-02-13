@@ -25,10 +25,9 @@ This directory contains example scripts demonstrating various features of the AI
 Make sure you have set up your environment variables in `.env`:
 
 ```bash
-export OPENAI_API_KEY="your-openai-key"
+export OPENAI_API_KEY="your-openai-key"  # Required
 export ANTHROPIC_API_KEY="your-anthropic-key"  # Optional
-export GITHUB_TOKEN="your-github-token"        # Optional
-export TAVILY_API_KEY="your-tavily-key"       # Optional
+export GITHUB_TOKEN="your-github-token"  # Optional for issue creation
 ```
 
 Then run any example:

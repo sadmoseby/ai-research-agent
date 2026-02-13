@@ -5,6 +5,8 @@ Test the complete workflow without validate node.
 import asyncio
 import os
 
+import pytest
+
 # Set testing environment
 os.environ["TESTING"] = "true"
 os.environ["OPENAI_API_KEY"] = "test-key-for-testing"
@@ -15,13 +17,14 @@ from agent.graph import create_research_graph
 from agent.state import ResearchState
 
 
+@pytest.mark.requires_api
 async def test_workflow_without_validate():
     """Test the complete workflow without the validate node."""
 
     print("Testing complete workflow without validate node...")
 
     # Create config
-    config = Config.from_env()
+    config = Config()
 
     # Create graph
     graph = create_research_graph(config)

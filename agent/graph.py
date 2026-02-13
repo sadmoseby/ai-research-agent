@@ -9,6 +9,7 @@ from langgraph.graph import END, START, StateGraph
 
 from .config import Config, get_logger
 from .nodes.criticism import criticism_node
+from .nodes.github_issue import github_issue_node
 from .nodes.persist import persist_node
 from .nodes.plan import plan_node
 from .nodes.synthesize import synthesize_node
@@ -79,6 +80,13 @@ def get_next_enabled_node(config: Config, current_node: str, node_sequence: list
 def create_research_graph(config: Config) -> StateGraph:
     """Create the LangGraph workflow for research proposal generation."""
     logger.info("Creating research graph with configuration")
+    
+    # Initialize ResearchPrompts with config thresholds
+    from .prompts import ResearchPrompts
+    ResearchPrompts.set_thresholds(
+        min_viability_score=config.min_viability_score,
+        max_planning_iterations=config.max_planning_iterations
+    )
 
     # Create the graph
     workflow = StateGraph(ResearchState)
@@ -150,11 +158,21 @@ def create_research_graph(config: Config) -> StateGraph:
             create_logged_node_wrapper(persist_wrapper, "persist"),
         )
 
+    if "github_issue" in enabled_nodes:
+
+        async def github_issue_wrapper(state):
+            return await github_issue_node(state, config.for_node("github_issue"))
+
+        workflow.add_node(
+            "github_issue",
+            create_logged_node_wrapper(github_issue_wrapper, "github_issue"),
+        )
+
     # Define the workflow with conditional routing
     logger.debug("Setting up workflow edges")
 
     # Define the standard node sequence
-    node_sequence = ["plan", "web_research", "criticism", "synthesize", "persist"]
+    node_sequence = ["plan", "web_research", "criticism", "synthesize", "persist", "github_issue"]
 
     # Start with the first enabled node
     first_enabled_node = get_next_enabled_node(config, "", node_sequence)
@@ -227,9 +245,27 @@ def create_research_graph(config: Config) -> StateGraph:
 
         workflow.add_conditional_edges("synthesize", route_after_synthesize, routing_options)
 
-    # Final edge to END
+    # Routing from persist: go to github_issue if upload_to_github is set, otherwise END
     if "persist" in enabled_nodes:
-        workflow.add_edge("persist", END)
+        if config.is_node_enabled("github_issue"):
+
+            def route_after_persist(state: ResearchState) -> str:
+                if state.get("upload_to_github", False):
+                    logger.info("Persist routing decision: upload_to_github=True -> github_issue")
+                    return "github_issue"
+                logger.info("Persist routing decision: upload_to_github=False -> END")
+                return END
+
+            workflow.add_conditional_edges(
+                "persist",
+                route_after_persist,
+                {"github_issue": "github_issue", END: END},
+            )
+        else:
+            workflow.add_edge("persist", END)
+
+    if "github_issue" in enabled_nodes:
+        workflow.add_edge("github_issue", END)
 
     # Add memory checkpointing
     memory = MemorySaver()

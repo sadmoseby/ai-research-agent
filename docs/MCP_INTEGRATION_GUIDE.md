@@ -1,34 +1,49 @@
-# MCP (Model Context Protocol) Integration Guide
+# Tool Integration Guide
 
 ## Overview
 
-The Lean Research Agent uses Model Context Protocol (MCP) for standardized communication with external tools and services. This provides consistent APIs, security controls, and extensibility across different tool types.
+The Lean Research Agent uses a **hybrid architecture** combining OpenAI's Responses API (with native web search) and Model Context Protocol (MCP) for standardized tool communication. This provides the best of both worlds: powerful built-in capabilities from OpenAI and extensible tool integration via MCP.
+
+## Architecture Overview
+
+### Primary: OpenAI Responses API
+- **Web Search**: Native web search tool via OpenAI
+- **Structured Outputs**: JSON schema validation built into API
+- **Streaming**: Real-time response streaming
+- **Reliability**: Managed by OpenAI infrastructure
+
+### Secondary: MCP Tools
+- **Validation**: Schema validation and repair via ValidationMCPTool
+- **Filesystem**: File operations and persistence
+- **GitHub CLI**: Issue creation via gh CLI tool
+- **Extensibility**: Easy addition of custom tools
 
 ## What is MCP?
 
-Model Context Protocol is a standardized protocol for AI systems to communicate with external tools. It offers:
+Model Context Protocol is a standardized protocol for AI systems to communicate with external tools. In this system, MCP is used for:
 
-- **Standardized Interface**: Consistent API across different tools
-- **Security**: Controlled access to external resources
-- **Efficiency**: Optimized communication patterns
-- **Extensibility**: Easy addition of new tools and services
+- **Schema Validation**: Validating proposals against JSON schema
+- **File Operations**: Filesystem access for persistence
+- **Tool Extensibility**: Easy addition of custom tools
 
-## Current MCP Integrations
+## Current Tool Integrations
 
-### Web Search Tools
-- **OpenAI MCP Server**: Primary web search via OpenAI's web search tool
-- **Tavily MCP Server**: Academic and research-focused search fallback
-- **Usage**: web_research node, fallback search capabilities
+### OpenAI Responses API (Primary)
+- **Web Search**: Comprehensive web search with real-time data
+- **Usage**: web_research node for gathering research
+- **Features**: Native integration, structured outputs, streaming responses
 
-### GitHub Integration
-- **GitHub MCP Server**: Code repository search for prior art checking
-- **Usage**: prior_art node for finding existing implementations
-- **Features**: Repository discovery, code analysis, similarity assessment
+### MCP Tools (Secondary)
 
-### Proposal Generation
-- **OpenAI MCP Server**: Structured output generation with JSON schema
-- **Usage**: synthesize node for proposal generation
-- **Features**: Schema validation, structured outputs, fallback to direct API
+#### Validation Tool
+- **Implementation**: ValidationMCPTool in `agent/tools/validation_mcp_tool.py`
+- **Usage**: synthesize node for schema validation and repair
+- **Features**: JSON schema validation, error reporting, repair suggestions
+
+#### GitHub CLI Integration
+- **Implementation**: github_issue node using gh CLI
+- **Usage**: Creating GitHub issues from proposals
+- **Features**: Issue creation, authentication via GH_TOKEN
 
 ## Architecture
 
@@ -78,61 +93,72 @@ class NodeConfig:
 ### Environment Variables
 
 ```bash
-# Global MCP Control
-USE_MCP=true
+# Required API Keys
+OPENAI_API_KEY=your_key_here        # For web search via Responses API
+GITHUB_TOKEN=your_token_here        # Optional, for GitHub issue creation
 
-# API Keys (still required for MCP servers)
-OPENAI_API_KEY=your_key_here
-GITHUB_TOKEN=your_token_here
-TAVILY_API_KEY=your_key_here
+# Node Control
+CRITICISM_ENABLED=true
+GITHUB_ISSUE_ENABLED=false
 
-# Per-Node Tool Access
-WEB_RESEARCH_MCP_TOOLS="web_search,tavily"
-PRIOR_ART_MCP_TOOLS="github"
-SYNTHESIZE_MCP_TOOLS="web_search"
+# GitHub Integration (optional)
+UPLOAD_TO_GITHUB=false
+GITHUB_OWNER=your-org
+GITHUB_REPOSITORY=your-repo
 ```
 
 ## Node-Specific Tool Requirements
 
 ### Planning Node (`plan`)
 - **Purpose**: Create research plans and search strategies
-- **Required Tools**: `filesystem` (optional)
-- **MCP Usage**: Limited, mainly for template storage
+- **Tools**: None specific
+- **Integration**: Uses LLM for planning logic
 
 ### Web Research Node (`web_research`)
-- **Purpose**: Conduct web-based research
-- **Required Tools**: `web_search` (primary), `tavily` (fallback)
-- **MCP Usage**: Heavy usage for search operations
-
-### Prior Art Node (`prior_art`)
-- **Purpose**: Search for existing implementations
-- **Required Tools**: `github` (primary)
-- **MCP Usage**: GitHub API integration for code search
+- **Purpose**: Conduct comprehensive web-based research
+- **Tools**: OpenAI Responses API with web search
+- **Integration**: Native OpenAI web search tool
 
 ### Criticism Node (`criticism`)
 - **Purpose**: Critical analysis of research proposals
-- **Required Tools**: None specific (uses LLM directly)
-- **MCP Usage**: Minimal, mainly for context storage
+- **Tools**: None specific (uses LLM directly)
+- **Integration**: LLM-based evaluation
 
 ### Synthesis Node (`synthesize`)
-- **Purpose**: Generate structured proposals
-- **Required Tools**: `web_search` (for structured outputs)
-- **MCP Usage**: OpenAI MCP for structured generation
-
-### Validation Node (`validate`)
-- **Purpose**: Schema validation and repair
-- **Required Tools**: None specific
-- **MCP Usage**: None (uses jsonschema library)
+- **Purpose**: Generate structured proposals with validation
+- **Tools**: ValidationMCPTool for schema validation
+- **Integration**: MCP validation tool + OpenAI structured outputs
 
 ### Persistence Node (`persist`)
-- **Purpose**: Save research proposals and final workflow state to disk
-- **Required Tools**: `filesystem` (optional)
-- **MCP Usage**: Minimal, file operations
-- **Outputs**: Two files - `{slug}.json` (proposal) and `{slug}_state.json` (workflow state)
+- **Purpose**: Save proposals to filesystem
+- **Tools**: Filesystem operations
+- **Integration**: Direct file I/O
+
+### GitHub Issue Node (`github_issue`)
+- **Purpose**: Create GitHub issues from proposals
+- **Tools**: GitHub CLI (gh command)
+- **Integration**: Subprocess call to gh CLI
 
 ## Implementation Details
 
-### MCP Client Initialization
+### ValidationMCPTool Usage
+
+The ValidationMCPTool is used in the synthesize node for schema validation:
+
+```python
+from agent.tools.validation_mcp_tool import ValidationMCPTool
+
+# Initialize validation tool
+validation_tool = ValidationMCPTool(config)
+
+# Validate proposal
+result = validation_tool.validate_proposal(proposal_json)
+
+if result["is_valid"]:
+    print("Proposal is valid!")
+else:
+    print(f"Validation errors: {result['errors']}")
+```
 
 ```python
 # Node-specific client with tool filtering
@@ -140,87 +166,83 @@ mcp_client = MCPClient(config, node_name="web_research")
 available_tools = mcp_client.get_available_tool_names()
 ```
 
-### Tool Availability Checking
+### OpenAI Responses API Usage
+
+The web_research node uses OpenAI's native web search:
 
 ```python
-# Check if specific tool is available
-if mcp_client.has_tool("web_search"):
-    # Use MCP tool
-    result = await mcp_client.call_tool("web_search", params)
-else:
-    # Fallback to direct API
-    result = await fallback_search(query)
+from agent.llm_client import LLMClient
+
+# Initialize LLM client with web search capability
+llm_client = LLMClient(config, node_name="web_research")
+
+# Conduct research with web search tool
+response = await llm_client.chat_completion(
+    messages=[{"role": "user", "content": "Research momentum trading strategies"}],
+    tools=["web_search"]  # Enable web search tool
+)
 ```
 
-### Error Handling and Fallbacks
+### Error Handling
 
 ```python
 try:
-    # Attempt MCP tool usage
-    result = await mcp_client.use_web_search(query)
-except MCPToolError:
-    # Fall back to direct API calls
-    result = await direct_search_api(query)
+    # Attempt validation
+    result = validation_tool.validate_proposal(proposal)
+    if not result["is_valid"]:
+        # Handle validation errors
+        errors = result["errors"]
+        # Attempt repair...
+except Exception as e:
+    logger.error(f"Validation failed: {e}")
+    # Fallback handling
 ```
 
-## Tool Descriptions for LLMs
+## Benefits of Hybrid Architecture
 
-When nodes use MCP tools, the LLM is informed about available tools:
+### OpenAI Responses API
+- **Native Web Search**: Built-in, reliable web search capability
+- **Structured Outputs**: JSON schema validation at API level
+- **Streaming**: Real-time response streaming
+- **Managed Infrastructure**: No server management needed
 
-```python
-def format_available_tools(tools: List[str]) -> str:
-    """Format tool descriptions for LLM prompts."""
-    descriptions = {
-        "web_search": "Search the web for current information and research",
-        "github": "Search GitHub repositories for code and implementations",
-        "tavily": "Academic and research-focused web search",
-        "filesystem": "Read and write files for data persistence"
-    }
-    return "\n".join([f"- {tool}: {descriptions.get(tool, 'Tool description not available')}"
-                     for tool in tools])
-```
-
-## Benefits of MCP Integration
-
-### For Developers
-- **Consistent APIs**: Same interface pattern across all tools
-- **Easy Testing**: Mock MCP servers for development
-- **Clear Dependencies**: Explicit tool requirements per node
-
-### For Users
-- **Reliability**: Standardized error handling and retries
-- **Security**: Controlled tool access and permissions
-- **Performance**: Optimized communication protocols
-
-### For Operations
-- **Monitoring**: Centralized tool usage tracking
-- **Configuration**: Unified tool configuration system
-- **Debugging**: Clear tool interaction logs
+### MCP Tools
+- **Validation**: Robust schema validation with detailed error reporting
+- **Extensibility**: Easy addition of custom tools
+- **Local Tools**: GitHub CLI and filesystem operations
+- **Testing**: Easy mocking for development
 
 ## Future Extensions
 
-The MCP architecture supports easy addition of new tools:
+The hybrid architecture supports easy addition of new capabilities:
 
+### Via OpenAI
+- **Function Calling**: Custom tools via OpenAI function calling
+- **File Search**: Document search capabilities
+- **Code Interpreter**: Python execution
+
+### Via MCP
 - **Database Connectors**: SQL, NoSQL database access
-- **APIs Services**: Financial data APIs, market data feeds
+- **Custom Validators**: Domain-specific validation rules
 - **File Processors**: PDF parsing, document analysis
-- **Calculation Engines**: Mathematical computation services
 
 ## Troubleshooting
 
 ### Common Issues
 
-1. **Tool Not Available**: Check MCP server configuration and API keys
-2. **Permission Denied**: Verify node has access to required tools
-3. **Connection Timeout**: Adjust timeout settings in MCP configuration
-4. **Fallback Behavior**: Ensure fallback mechanisms are properly configured
+1. **Validation Fails**: Check JSON schema matches proposal structure
+2. **GitHub Issue Creation Fails**: Verify gh CLI is installed and GH_TOKEN is set
+3. **Web Search Issues**: Check OPENAI_API_KEY and API limits
 
 ### Debug Commands
 
 ```bash
-# Check MCP tool availability
-python -c "from agent.tools.mcp_client import MCPClient; print(MCPClient.check_availability())"
+# Test validation tool
+python -c "from agent.tools.validation_mcp_tool import ValidationMCPTool; from agent.config import Config; t=ValidationMCPTool(Config.from_env()); print('Validation tool ready')"
 
-# Test specific tool access
-python -c "from agent.config import Config; c=Config.from_env(); print(c.get_mcp_tools_for_node('web_research'))"
+# Test GitHub CLI
+gh --version
+
+# Verify OpenAI API
+python -c "import openai; print('OpenAI SDK installed')"
 ```

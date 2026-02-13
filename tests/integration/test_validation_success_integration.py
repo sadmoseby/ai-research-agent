@@ -47,7 +47,7 @@ async def test_successful_validation_integration():
     )
 
     # Create config
-    config = Config.from_env()
+    config = Config()
 
     # Mock the LLM client's json_completion method
     with patch("agent.llm_client.LLMClient.json_completion", new_callable=AsyncMock) as mock_json:
@@ -111,7 +111,7 @@ async def test_validation_failure_and_repair():
         repair_attempts=0,
     )
 
-    config = Config.from_env()
+    config = Config()
 
     # Mock LLM client to first return invalid, then valid proposal
     with (

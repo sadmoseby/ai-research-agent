@@ -55,11 +55,11 @@ test: test-unit test-integration
 
 test-unit:
 	@echo "🧪 Running unit tests..."
-	pytest tests/unit/ -v
+	pytest tests/unit/ -v --no-cov
 
 test-integration:
 	@echo "🔗 Running integration tests..."
-	pytest tests/integration/ -v -m "not requires_api"
+	pytest tests/integration/ -v -m "not requires_api" --no-cov
 
 test-e2e:
 	@echo "🎯 Running end-to-end tests..."

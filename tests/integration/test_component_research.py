@@ -59,7 +59,7 @@ This approach uses ML models to predict post-earnings momentum patterns.
     # Test component research function
     print("✓ Testing component research function...")
     results = await _conduct_component_research(
-        mock_mcp_client, "ALPHA", "momentum strategy", "research plan", False, ["web_search"]
+        mock_mcp_client, "ALPHA", "momentum strategy", "research plan", False, ["web_search"], []
     )
 
     assert results is not None

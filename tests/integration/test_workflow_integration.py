@@ -18,7 +18,7 @@ class TestWorkflowIntegration:
     def test_graph_creation_with_all_nodes_enabled(self):
         """Test creating research graph with all nodes enabled."""
         with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}, clear=False):
-            config = Config.from_env()
+            config = Config()
             graph = create_research_graph(config)
 
             # Verify graph was created successfully
@@ -35,7 +35,7 @@ class TestWorkflowIntegration:
         env_vars = {"OPENAI_API_KEY": "test-key", "CRITICISM_ENABLED": "false"}
 
         with patch.dict(os.environ, env_vars, clear=False):
-            config = Config.from_env()
+            config = Config()
 
             # Verify disabled nodes are actually disabled
             assert not config.is_node_enabled("criticism")
@@ -99,7 +99,7 @@ class TestWorkflowIntegration:
         }
 
         with patch.dict(os.environ, env_vars, clear=False):
-            config = Config.from_env()
+            config = Config()
 
             state = ResearchState(idea="test strategy", alpha_only=True, slug="test", current_step="web_research")
 
@@ -137,7 +137,7 @@ class TestWorkflowIntegration:
         }
 
         with patch.dict(os.environ, env_vars, clear=False):
-            config = Config.from_env()
+            config = Config()
 
             # Verify different providers are configured
             available_providers = config.get_available_providers()
@@ -173,7 +173,7 @@ class TestWorkflowIntegration:
         }
 
         with patch.dict(os.environ, env_vars, clear=False):
-            config = Config.from_env()
+            config = Config()
 
             # Verify configuration is applied
             assert config.temperature == 0.3

@@ -85,7 +85,7 @@ async def criticism_node(state: ResearchState, config: Config) -> Dict[str, Any]
     instruments = state.get("instruments", [])
     research_plan = state.get("research_plan", "")
     # Include component scope note if available
-    components_flag = state.get("components") or config.get_components_from_env()
+    components_flag = state.get("components") or config.get_components_from_config()
     component_names = []
     try:
         from ..state import ResearchComponents as _RC

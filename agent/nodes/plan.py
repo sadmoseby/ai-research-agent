@@ -71,7 +71,7 @@ def plan_node(state: ResearchState, config: Config) -> Dict[str, Any]:
         plan = ResearchPrompts.ALPHA_ONLY_RESEARCH_PLAN_TEMPLATE.format(idea=modified_idea).strip()
     else:
         # If specific components are provided in state, scope the plan accordingly
-        components_flag = state.get("components") or config.get_components_from_env()
+        components_flag = state.get("components") or config.get_components_from_config()
         if components_flag:
             # Map IntFlag/int bitmask to list of component names safely
             selected_components: list[str] = []

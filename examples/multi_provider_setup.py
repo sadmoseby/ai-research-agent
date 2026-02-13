@@ -176,11 +176,9 @@ export SYNTHESIZE_MODEL="claude-3-opus-20240229"
 
 # Technical research specialist
 export WEB_RESEARCH_PROVIDER="openai"
-export PRIOR_ART_PROVIDER="openai"
 
 # Critical analysis specialist
 export CRITICISM_PROVIDER="gemini"
-export VALIDATE_PROVIDER="gemini"
 """
     )
 

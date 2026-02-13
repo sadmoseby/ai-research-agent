@@ -5,11 +5,20 @@ Test script for the restart logic in the research agent.
 import sys
 from pathlib import Path
 
+import pytest
+
 # Add project root to path
 project_root = Path(__file__).parent
 sys.path.insert(0, str(project_root))
 
 from agent.prompts import ResearchPrompts
+
+
+@pytest.fixture(autouse=True)
+def reset_prompts():
+    """Reset ResearchPrompts thresholds before each test."""
+    ResearchPrompts.set_thresholds(min_viability_score=51, max_planning_iterations=3)
+    yield
 
 
 def test_criticism_restart_logic():

@@ -7,9 +7,15 @@ All prompts are organized here for easy modification and maintenance.
 class ResearchPrompts:
     """Container for all research agent prompts."""
 
-    # Configuration constants
+    # Configuration constants (defaults, can be overridden by Config)
     MIN_VIABILITY_SCORE = 51  # Minimum score to proceed to synthesis
     MAX_PLANNING_ITERATIONS = 3  # Maximum times to restart planning
+    
+    @classmethod
+    def set_thresholds(cls, min_viability_score: int = 51, max_planning_iterations: int = 3):
+        """Update threshold values from config."""
+        cls.MIN_VIABILITY_SCORE = min_viability_score
+        cls.MAX_PLANNING_ITERATIONS = max_planning_iterations
 
     # Planning node prompts
     PLANNING_SYSTEM_PROMPT = """

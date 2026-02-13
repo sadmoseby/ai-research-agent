@@ -24,6 +24,9 @@ class ResearchState(TypedDict, total=False):
     components: ResearchComponents
     instruments: List[str]  # Financial instruments: stocks, options, futures, forex, crypto
     slug: str
+    output_dir: str  # Output directory for proposal files
+    upload_to_github: bool  # Whether to create a GitHub issue after persisting
+    bootstrap_config_path: Optional[str]  # Path to bootstrap config (for GitHub auth)
 
     # Current step tracking
     current_step: str
@@ -58,6 +61,7 @@ class ResearchState(TypedDict, total=False):
     final_proposal: Optional[Dict[str, Any]]
     proposal_path: Optional[str]
     state_path: Optional[str]
+    github_issue_url: Optional[str]
 
     # Error handling
     error: Optional[str]

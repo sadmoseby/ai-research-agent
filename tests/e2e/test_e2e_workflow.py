@@ -18,6 +18,7 @@ from agent.state import ResearchState
 class TestE2EWorkflow:
     """End-to-end tests for the complete research workflow."""
 
+    @pytest.mark.requires_api
     @patch("agent.nodes.plan.MCPClient")
     @patch("agent.nodes.web_research.MCPClient")
     async def test_complete_workflow_alpha_only_mock(self, mock_mcp_web, mock_mcp_plan):
@@ -40,7 +41,7 @@ class TestE2EWorkflow:
             )
             mock_mcp_web.return_value.close = AsyncMock()
 
-            config = Config.from_env()
+            config = Config()
             graph = create_research_graph(config)
 
             # Run the workflow
@@ -143,7 +144,7 @@ class TestE2EWorkflow:
         if not api_key or api_key.startswith("test"):
             pytest.skip("Real API key required for this test")
 
-        config = Config.from_env()
+        config = Config()
         graph = create_research_graph(config)
 
         simple_state = ResearchState(idea="simple test", alpha_only=True, slug="simple-test", current_step="plan")
@@ -193,7 +194,7 @@ class TestE2EWorkflow:
         }
 
         with patch.dict(os.environ, env_vars, clear=False):
-            config = Config.from_env()
+            config = Config()
 
             # Verify multi-provider configuration
             providers = config.get_available_providers()
@@ -219,7 +220,7 @@ class TestE2EWorkflow:
         """Test edge cases in configuration during E2E workflow."""
         # Test with minimal configuration
         with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}, clear=False):
-            config = Config.from_env()
+            config = Config()
             graph = create_research_graph(config)
 
             assert graph is not None
@@ -233,7 +234,7 @@ class TestE2EWorkflow:
         }
 
         with patch.dict(os.environ, env_vars, clear=False):
-            config = Config.from_env()
+            config = Config()
 
             # Core nodes should still be enabled
             assert config.is_node_enabled("plan")
@@ -264,7 +265,7 @@ class TestE2EWorkflow:
         }
 
         with patch.dict(os.environ, env_vars, clear=False):
-            config = Config.from_env()
+            config = Config()
             graph = create_research_graph(config)
 
             # Use a simple test idea
@@ -316,7 +317,7 @@ class TestE2EWorkflow:
         }
 
         with patch.dict(os.environ, env_vars, clear=False):
-            config = Config.from_env()
+            config = Config()
             graph = create_research_graph(config)
 
             # Use a simple test idea WITHOUT alpha_only flag

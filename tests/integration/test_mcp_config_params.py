@@ -18,7 +18,7 @@ async def test_mcp_config_integration():
     os.environ["TAVILY_API_KEY"] = "fake-test-key"
 
     # Create config
-    config = Config.from_env()
+    config = Config()
 
     # Create mock LLM client
     class MockLLMClient:

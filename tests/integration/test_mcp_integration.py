@@ -25,7 +25,7 @@ async def test_node_tool_configuration():
     os.environ["GITHUB_TOKEN"] = "test-token"
     os.environ["TAVILY_API_KEY"] = "test-key"
 
-    config = Config.from_env()
+    config = Config()
 
     # Create LLM client for testing
     llm_client = LLMClient(config)
@@ -83,7 +83,7 @@ async def test_tool_fallback_behavior():
     os.environ.pop("GITHUB_TOKEN", None)
     os.environ.pop("TAVILY_API_KEY", None)
 
-    config = Config.from_env()
+    config = Config()
 
     # Create LLM client for testing
     llm_client = LLMClient(config)
@@ -115,7 +115,7 @@ async def test_prompt_integration():
     os.environ["GITHUB_TOKEN"] = "test-token"
     os.environ["TAVILY_API_KEY"] = "test-key"
 
-    config = Config.from_env()
+    config = Config()
     llm_client = LLMClient(config)
     mcp_client = MCPClient(config, llm_client, node_name="synthesize")
     available_tools = mcp_client.get_available_tool_names()
@@ -132,6 +132,7 @@ async def test_prompt_integration():
     alpha_mode_note = ResearchPrompts.get_alpha_mode_note(False)
     system_prompt = ResearchPrompts.SYNTHESIS_SYSTEM_PROMPT.format(
         json_schema=schema_json_str,
+        instruments="SPY (S&P 500 ETF)",
     )
 
     print("Synthesis System Prompt (with tools):")
@@ -139,7 +140,10 @@ async def test_prompt_integration():
     print(system_prompt[:500] + "..." if len(system_prompt) > 500 else system_prompt)
 
     # Show criticism prompt with tools
-    criticism_prompt = ResearchPrompts.CRITICISM_SYSTEM_PROMPT.format(available_tools=tools_formatted)
+    criticism_prompt = ResearchPrompts.CRITICISM_SYSTEM_PROMPT.format(
+        available_tools=tools_formatted,
+        instruments="SPY (S&P 500 ETF)",
+    )
 
     print("\nCriticism System Prompt (with tools):")
     print("-" * 40)

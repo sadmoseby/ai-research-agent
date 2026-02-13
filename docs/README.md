@@ -12,9 +12,10 @@
 - [CRITICISM_NODE.md](./CRITICISM_NODE.md) - Quality control and evaluation system
 - [CONDITIONAL_RESTART.md](./CONDITIONAL_RESTART.md) - Automatic restart logic for quality assurance
 - [NODE_ENABLE_DISABLE.md](./NODE_ENABLE_DISABLE.md) - Selective node execution for different use cases
+- [GITHUB_ISSUE_NODE.md](./GITHUB_ISSUE_NODE.md) - GitHub issue creation from proposals
 
 ### Tool Integration
-- [MCP_INTEGRATION_GUIDE.md](./MCP_INTEGRATION_GUIDE.md) - Model Context Protocol integration and usage
+- [MCP_INTEGRATION_GUIDE.md](./MCP_INTEGRATION_GUIDE.md) - Hybrid architecture with OpenAI + MCP tools
 - [MULTI_PROVIDER_IMPLEMENTATION.md](./MULTI_PROVIDER_IMPLEMENTATION.md) - Technical details of multi-LLM support
 
 ### System Components
@@ -29,10 +30,7 @@
 
 ### Development
 - Enable debug logging: `LOG_LEVEL=DEBUG`
-- Fast prototyping: `CRITICISM_ENABLED=false PRIOR_ART_ENABLED=false`
-- Node isolation: Disable specific nodes for testing
-- Enable debug logging: `LOG_LEVEL=DEBUG`
-- Fast prototyping: `CRITICISM_ENABLED=false PRIOR_ART_ENABLED=false`
+- Fast prototyping: `CRITICISM_ENABLED=false`
 - Node isolation: Disable specific nodes for testing
 
 ### Production
@@ -40,10 +38,10 @@
 - Multi-provider setup: Different LLMs for different tasks
 - Monitoring: File logging with rotation enabled
 
-### Research Workflows
-- Alpha-only mode: `--alpha-only` flag for focused proposals
-- Comprehensive research: Default full pipeline
-- Prior art checking: GitHub integration for novelty assessment
+### GitHub Integration
+- Issue creation: `UPLOAD_TO_GITHUB=true`
+- Configure repository: `GITHUB_OWNER=org GITHUB_REPOSITORY=repo`
+- Requires: GitHub token and gh CLI installed
 
 ## Configuration Quick Reference
 
@@ -52,14 +50,13 @@
 # Required
 OPENAI_API_KEY="your-key"
 
-# Recommended
+# Optional
 GITHUB_TOKEN="your-token"
-TAVILY_API_KEY="your-key"
 ANTHROPIC_API_KEY="your-key"
 
 # Node control
 CRITICISM_ENABLED=true
-PRIOR_ART_ENABLED=true
+GITHUB_ISSUE_ENABLED=false
 
 # Provider selection
 SYNTHESIZE_PROVIDER="anthropic"
@@ -82,7 +79,7 @@ python main.py propose --idea "volatility arbitrage" --slug "vol_arb"
 
 ### Workflow
 ```
-START → plan → web_research → prior_art → criticism → synthesize → validate → persist → END
+START → plan → web_research → criticism → synthesize → persist → github_issue → END
 ```
 
 ### Key Features

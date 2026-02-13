@@ -9,7 +9,7 @@ The Lean Research Agent is a comprehensive research workflow system built on Lan
 ### 1. Workflow Engine (LangGraph)
 - **File**: `agent/graph.py`
 - **Features**: Checkpointed state management, conditional routing, node enable/disable
-- **Nodes**: plan → web_research → prior_art → criticism → synthesize → validate → persist
+- **Nodes**: plan → web_research → criticism → synthesize → persist → github_issue
 
 ### 2. Configuration System
 - **File**: `agent/config.py`
@@ -22,13 +22,13 @@ The Lean Research Agent is a comprehensive research workflow system built on Lan
 
 ### 4. Node System
 - **Directory**: `agent/nodes/`
-- **Files**: plan.py, web_research.py, prior_art.py, criticism.py, synthesize.py, validate.py, persist.py
-- **Features**: Individual node configuration, MCP tool integration, comprehensive logging
+- **Files**: plan.py, web_research.py, criticism.py, synthesize.py, persist.py, github_issue.py
+- **Features**: Individual node configuration, OpenAI Responses API with web search, comprehensive logging
 
-### 5. Tool Integration (MCP)
-- **Directory**: `agent/tools/`
-- **Files**: mcp_client.py, github_api.py, tavily_tool.py
-- **Features**: Standardized tool protocol, per-node tool access, fallback mechanisms
+### 5. Tool Integration
+- **OpenAI Responses API**: Web search tool for research gathering
+- **GitHub CLI**: Issue creation via gh CLI tool
+- **Features**: Direct API integration, structured outputs, fallback mechanisms
 
 ### 6. LLM Client System
 - **File**: `agent/llm_client.py`
@@ -41,9 +41,9 @@ The Lean Research Agent is a comprehensive research workflow system built on Lan
 ## Key Features
 
 ### Conditional Restart Logic
-- **Prior Art Restart**: Triggered when 3+ similar implementations found
 - **Criticism Score Restart**: Triggered when viability score < 51/100
 - **Iteration Limits**: Maximum 3 planning iterations to prevent infinite loops
+- **Quality Improvement**: Each iteration refines approach based on identified issues
 
 ### Node Enable/Disable System
 - **Selective Execution**: Enable/disable individual workflow nodes
@@ -55,10 +55,10 @@ The Lean Research Agent is a comprehensive research workflow system built on Lan
 - **Per-Node Configuration**: Different providers for different tasks
 - **Fallback Logic**: Automatic provider availability detection
 
-### MCP Tool Integration
-- **Global Registry**: Centralized MCP client management
-- **Per-Node Access**: Fine-grained tool access control
-- **Tool Types**: web_search, github, tavily, filesystem
+### OpenAI Integration
+- **Responses API**: Comprehensive web search with structured outputs
+- **Web Search Tool**: Direct access to current information
+- **Structured Outputs**: JSON schema validation built into API calls
 
 ### Comprehensive Logging
 - **Graph-Level**: Workflow execution, routing decisions
@@ -69,13 +69,13 @@ The Lean Research Agent is a comprehensive research workflow system built on Lan
 
 ### Standard Flow
 ```
-START → plan → web_research → prior_art → criticism → synthesize → validate → persist → END
+START → plan → web_research → criticism → synthesize → persist → github_issue → END
 ```
 
 ### Conditional Routing
-- **prior_art** can restart planning if significant prior art found
 - **criticism** can restart planning if low viability score
-- **validate** can repair via synthesize on validation errors
+- **synthesize** includes built-in validation with automatic retry
+- **persist** conditionally routes to github_issue if enabled
 
 ### Alpha-Only Mode
 - Enforces exactly one alpha (new or amend) and one existing universe
@@ -85,9 +85,8 @@ START → plan → web_research → prior_art → criticism → synthesize → v
 
 ### Basic Setup
 ```bash
-export OPENAI_API_KEY="your-key"
-export GITHUB_TOKEN="your-token"
-export TAVILY_API_KEY="your-key"
+export OPENAI_API_KEY="your-key"  # Required
+export GITHUB_TOKEN="your-token"  # Optional, for issue creation
 ```
 
 ### Node-Specific Configuration
@@ -95,26 +94,32 @@ export TAVILY_API_KEY="your-key"
 export SYNTHESIZE_PROVIDER="anthropic"
 export WEB_RESEARCH_PROVIDER="openai"
 export CRITICISM_TEMPERATURE="0.9"
-export VALIDATE_USE_MCP="false"
 ```
 
 ### Node Enable/Disable
 ```bash
 export CRITICISM_ENABLED=false
-export PRIOR_ART_ENABLED=false
+export GITHUB_ISSUE_ENABLED=false
+```
+
+### GitHub Issue Upload
+```bash
+export UPLOAD_TO_GITHUB=true
+export GITHUB_OWNER="your-org"
+export GITHUB_REPOSITORY="your-repo"
 ```
 
 ## Output
 
 ### Schema Compliance
-- Strict validation against `schema/lean-research-schema.jsonc`
+- Validation against `schema/lean-research-schema.jsonc`
 - JSON Schema Draft 2020-12 format
-- Automatic repair attempts on validation failure
+- Built-in validation via OpenAI Structured Outputs
 
 ### File Output
 - Proposals saved to `proposals/<slug>.json`
-- Detailed validation reports
-- Alpha-only mode support
+- Optional GitHub issue creation with proposal details
+- Alpha-only mode support with simplified schema
 
 ## Development
 

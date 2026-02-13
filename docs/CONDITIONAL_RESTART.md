@@ -6,24 +6,23 @@ The research agent workflow includes conditional restart logic that automaticall
 
 ## When Restarts Occur
 
-1. **Significant prior art is discovered** (3+ similar implementations)
-2. **Low viability scores are received** (<51/100 from criticism analysis)
+**Low viability scores are received** (<51/100 from criticism analysis)
 
-This ensures higher quality research outputs by iteratively refining approaches when issues are identified.
+This ensures higher quality research outputs by iteratively refining approaches when significant issues are identified.
 
 ## Key Features
 
 ### Automatic Quality Control
 
-- **Prior Art Check**: Prevents pursuing ideas with too much existing competition
 - **Viability Assessment**: Prevents proceeding with fundamentally flawed approaches
 - **Iteration Limits**: Maximum 3 planning cycles to prevent infinite loops
+- **Continuous Improvement**: Each iteration incorporates criticism feedback
 
 ### Intelligent Restart Guidance
 
-- **Differentiation Focus**: When prior art found, guides toward novel approaches
 - **Risk Mitigation**: When viability low, guides toward addressing identified concerns
-- **Enhanced Search**: Additional search queries in subsequent iterations
+- **Enhanced Focus**: Additional context and constraints in subsequent iterations
+- **Incremental Refinement**: Each iteration builds on previous feedback
 
 ### Scoring System
 
@@ -49,19 +48,13 @@ planning_iteration: int
 ### Conditional Routing
 
 ```
-plan → web_research → prior_art ──┐
+plan → web_research → criticism ──┐
   ↑                                │
-  │  if substantial prior art      ↓
-  └────────────────────────────────●
+  │  if low viability score        ↓
+  └─────────────────────────────────●
                                    │
                                    ↓
-                               criticism ──┐
-  ↑                                       │
-  │  if low viability score               ↓
-  └───────────────────────────────────────●
-                                          │
-                                          ↓
-                                    synthesize → validate → persist
+                              synthesize → persist → github_issue
 ```
 
 ### Configuration Constants
@@ -69,7 +62,6 @@ plan → web_research → prior_art ──┐
 ```python
 MIN_VIABILITY_SCORE = 51      # Minimum score to proceed
 MAX_PLANNING_ITERATIONS = 3   # Maximum restart attempts
-PRIOR_ART_THRESHOLD = 3       # Prior art count triggering restart
 ```
 
 ## Node Changes
@@ -78,14 +70,8 @@ PRIOR_ART_THRESHOLD = 3       # Prior art count triggering restart
 
 - Tracks planning iterations
 - Provides restart-specific guidance
-- Adds varied search queries for iterations
+- Incorporates criticism feedback into replanning
 - Clears restart flags
-
-### `prior_art.py`
-
-- Evaluates prior art significance
-- Sets restart conditions
-- Routes conditionally to plan or criticism
 
 ### `criticism.py`
 
@@ -97,7 +83,7 @@ PRIOR_ART_THRESHOLD = 3       # Prior art count triggering restart
 
 - Implements conditional edges
 - Routes based on restart flags
-- Maintains validation retry logic
+- Enforces iteration limits
 
 ## Benefits
 

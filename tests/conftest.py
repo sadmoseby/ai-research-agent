@@ -48,7 +48,7 @@ def temp_dir() -> Generator[Path, None, None]:
 @pytest.fixture
 def test_config(mock_env) -> Config:
     """Create test configuration."""
-    return Config.from_env()
+    return Config()
 
 
 @pytest.fixture

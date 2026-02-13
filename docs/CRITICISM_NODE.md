@@ -4,26 +4,18 @@
 
 The criticism node provides critical evaluation of research proposals before synthesis, enhancing proposal quality by identifying potential issues, risks, and areas for improvement. For overall architecture details, see [ARCHITECTURE_OVERVIEW.md](./ARCHITECTURE_OVERVIEW.md).
 
-**Key Feature**: Conditional routing that restarts planning if the proposal receives a low viability score (<51/100) or if significant prior art is found (3+ similar implementations).
+**Key Feature**: Conditional routing that restarts planning if the proposal receives a low viability score (<51/100).
 
 ## Workflow Changes
 
 The updated workflow now includes conditional routing:
 
-1. **plan** → 2. **web_research** → 3. **prior_art**
-   - If substantial prior art found → **restart plan**
-   - Otherwise → 4. **criticism**
+1. **plan** → 2. **web_research** → 3. **criticism**
 4. **criticism**
    - If low viability score → **restart plan**
-   - Otherwise → 5. **synthesize** → 6. **validate** → 7. **persist**
+   - Otherwise → 5. **synthesize** → 6. **persist** → 7. **github_issue**
 
 ### Restart Conditions
-
-#### Prior Art Restart
-
-- Triggered when 3+ similar implementations are found
-- Helps ensure novel approaches rather than duplicating existing work
-- Planning restarts with guidance to focus on differentiation
 
 #### Criticism Score Restart
 
@@ -68,10 +60,6 @@ The updated workflow now includes conditional routing:
 
 ## Node Updates
 
-### `agent/nodes/prior_art.py`
-
-- Updated `current_step` to point to "criticism" instead of "synthesize"
-
 ### `agent/nodes/synthesize.py`
 
 - Now includes criticism results in research context
@@ -82,7 +70,7 @@ The updated workflow now includes conditional routing:
 
 - Added criticism node to workflow
 - Updated edge connections to include criticism step
-- Maintains validation retry logic
+- Implements conditional routing based on criticism scores
 
 ## Criticism Node Features
 
