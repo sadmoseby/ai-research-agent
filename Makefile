@@ -1,6 +1,15 @@
 # AI Research Agent - Development Makefile
 
-.PHONY: help install test test-unit test-integration test-e2e test-all clean lint format setup consolidate
+.PHONY: help install test test-unit test-integration test-e2e test-all clean lint format setup consolidate \
+        docker-build docker-push docker-run docker-clean
+
+# Docker configuration — override on the command line as needed:
+#   make docker-build IMAGE_TAG=v1.2.3
+#   make docker-push  REGISTRY=us-central1-docker.pkg.dev/my-project/my-repo
+IMAGE_NAME ?= ai-research-agent
+IMAGE_TAG  ?= latest
+REGISTRY   ?=
+_FULL_IMAGE = $(if $(REGISTRY),$(REGISTRY)/$(IMAGE_NAME):$(IMAGE_TAG),$(IMAGE_NAME):$(IMAGE_TAG))
 
 # Default target
 help:
@@ -24,6 +33,12 @@ help:
 	@echo "  lint           - Run all linters (flake8, mypy, bandit)"
 	@echo "  format         - Format code (black, isort)"
 	@echo "  format-check   - Check code formatting without changes"
+	@echo ""
+	@echo "Docker:"
+	@echo "  docker-build   - Build the container image  (IMAGE_NAME, IMAGE_TAG, REGISTRY)"
+	@echo "  docker-push    - Push the image to a registry"
+	@echo "  docker-run     - Run the container locally   (pass extra args via ARGS=)"
+	@echo "  docker-clean   - Remove the local image"
 	@echo ""
 	@echo "Cleanup:"
 	@echo "  clean          - Clean up temporary files and caches"
@@ -188,3 +203,20 @@ dev: format lint test-fast
 
 full-check: format lint test-coverage
 	@echo "✅ Full quality check completed!"
+
+# Docker
+docker-build:
+	@echo "Building Docker image $(_FULL_IMAGE)..."
+	docker build -t $(_FULL_IMAGE) .
+
+docker-push:
+	@echo "Pushing Docker image $(_FULL_IMAGE)..."
+	docker push $(_FULL_IMAGE)
+
+docker-run:
+	@echo "Running Docker container $(_FULL_IMAGE)..."
+	docker run --rm --env-file .env $(_FULL_IMAGE) $(ARGS)
+
+docker-clean:
+	@echo "Removing Docker image $(_FULL_IMAGE)..."
+	docker rmi $(_FULL_IMAGE) || true

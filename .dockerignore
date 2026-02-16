@@ -1,0 +1,58 @@
+# Python artifacts
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Tests and dev tooling
+tests/
+examples/
+docs/
+scripts/
+.pre-commit-config.yaml
+.flake8
+consolidate_tests.py
+bandit-report.json
+
+# Test output
+htmlcov/
+.coverage
+.coverage.*
+.pytest_cache/
+.tox/
+.nox/
+.mypy_cache/
+
+# Secrets and local config
+.env
+.env.*
+*.key
+*.pem
+.secrets
+
+# Version control
+.git/
+.gitignore
+
+# Build / package metadata
+pyproject.toml
+setup.py
+requirements-test.txt
+Makefile
+
+# IDE / OS
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Output directories
+proposals/
