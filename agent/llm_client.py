@@ -262,11 +262,21 @@ Your response should be JSON only, no additional text or explanations.
         try:
             content = response.content.strip()
 
-            # Strip markdown code blocks if present
-            if content.startswith("```json") and content.endswith("```"):
-                content = content[7:-3].strip()
-            elif content.startswith("```") and content.endswith("```"):
-                content = content[3:-3].strip()
+            # Strip markdown code blocks if present (handle truncated responses too)
+            if content.startswith("```"):
+                # Find the start of actual JSON content (first { or [)
+                json_start = -1
+                for i, ch in enumerate(content):
+                    if ch in "{[":
+                        json_start = i
+                        break
+                if json_start != -1:
+                    content = content[json_start:]
+                    # Remove trailing ``` if present (may be absent if response was truncated)
+                    if content.endswith("```"):
+                        content = content[:-3].strip()
+                    else:
+                        content = content.strip()
 
             return json.loads(content)
         except json.JSONDecodeError as e:

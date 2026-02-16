@@ -346,6 +346,9 @@ async def _generate_component_by_component_proposal(
             else:
                 logger.warning("Failed to generate %s component", schema_key)
 
+    # Add required inspiration field
+    final_proposal["inspiration"] = idea
+
     # Add metadata
     final_proposal["misc"] = {
         "prior_art": prior_art,

@@ -60,9 +60,6 @@ install-test:
 	@echo "📦 Installing test dependencies..."
 	pip install -r requirements-test.txt
 
-consolidate:
-	@echo "🧹 Consolidating test and example files..."
-	python consolidate_tests.py
 
 # Testing
 test: test-unit test-integration

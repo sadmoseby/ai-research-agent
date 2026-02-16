@@ -61,6 +61,7 @@ class ResearchState(TypedDict, total=False):
     final_proposal: Optional[Dict[str, Any]]
     proposal_path: Optional[str]
     state_path: Optional[str]
+    issue_path: Optional[str]
     github_issue_url: Optional[str]
 
     # Error handling
