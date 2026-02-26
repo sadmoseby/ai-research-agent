@@ -8,7 +8,7 @@
 #   make docker-push  REGISTRY=us-central1-docker.pkg.dev/my-project/my-repo
 IMAGE_NAME ?= ai-research-agent
 IMAGE_TAG  ?= latest
-REGISTRY   ?=
+REGISTRY   ?= ghcr.io/sadmoseby
 _FULL_IMAGE = $(if $(REGISTRY),$(REGISTRY)/$(IMAGE_NAME):$(IMAGE_TAG),$(IMAGE_NAME):$(IMAGE_TAG))
 
 # Default target
