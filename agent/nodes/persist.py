@@ -3,6 +3,8 @@ Persistence node for saving research proposals using MCP (Model Context Protocol
 """
 
 import json
+import re
+import uuid
 from pathlib import Path
 from typing import Any, Dict
 
@@ -16,18 +18,31 @@ from ..tools.mcp_client import MCPClient
 logger = get_logger("nodes.persist")
 
 
-def _generate_issue_markdown(proposal: Dict[str, Any], branch_name: str = "", image_name: str = "") -> str:
+def _compute_new_branch_name(branch_name: str) -> str:
+    """Determine the new branch name based on the base branch."""
+    uid = str(uuid.uuid4())
+    if branch_name == "main" or re.match(r"portfolio.*", branch_name, re.IGNORECASE):
+        return f"portfolio-{uid}"
+    elif re.match(r"alpha.*", branch_name, re.IGNORECASE):
+        return f"alpha-{uid}"
+    else:
+        return f"portfolio-{uid}"
+
+
+def _generate_issue_markdown(
+    proposal: Dict[str, Any],
+    new_branch_name: str = "",
+    image_name: str = "",
+) -> str:
     """Generate GitHub issue markdown from research proposal."""
-    # Convert proposal dict to formatted JSON string
     proposal_json = json.dumps(proposal, indent=2, ensure_ascii=False)
 
-    # Create issue template
     issue_template = f"""# Meta-Information
-* BEFORE creating the pull-request that implements this proposal, FIRST create a new branch from the base branch + commit. The pull-request should be merged into this branch
-* Please move the research-proposal into the research/r/live directory before actually implementing it.
+* Please move the research-proposal into the research/r/live directory before implementing it.
+* The pull-request should be raised against the BASE BRANCH: `{new_branch_name}`
 
 # Branch Information
-BranchName: {branch_name}
+BASE BRANCH: {new_branch_name}
 ImageName: {image_name}
 
 
@@ -114,18 +129,21 @@ async def persist_node(state: ResearchState, config: Config) -> Dict[str, Any]:
         issue_output_path = output_path / "issue.md"
         branch_name = state.get("branch_name", "")
         image_name = state.get("image_name", "")
-        issue_content = _generate_issue_markdown(final_proposal, branch_name, image_name)
+        new_branch_name = _compute_new_branch_name(branch_name)
+        issue_content = _generate_issue_markdown(final_proposal, new_branch_name, image_name)
         with open(issue_output_path, "w", encoding="utf-8") as f:
             f.write(issue_content)
 
         logger.info("Successfully saved proposal to: %s", proposal_output_path)
         logger.info("Successfully saved final state to: %s", state_output_path)
         logger.info("Successfully saved GitHub issue template to: %s", issue_output_path)
+        logger.info("Computed new branch name: %s (from base: %s)", new_branch_name, branch_name)
 
         return {
             "proposal_path": str(proposal_output_path),
             "state_path": str(state_output_path),
             "issue_path": str(issue_output_path),
+            "new_branch_name": new_branch_name,
             "validation_report": validation_report,
             "mcp_tools_available": available_tools,
             "error": None,

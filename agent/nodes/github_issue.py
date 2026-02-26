@@ -24,6 +24,60 @@ def _build_gh_env(token: Optional[str]) -> Dict[str, str]:
     return env
 
 
+def _create_github_branch(
+    owner: str,
+    repo: str,
+    base_branch: str,
+    new_branch: str,
+    token: Optional[str],
+) -> Optional[str]:
+    """Create a new GitHub branch from the tip of base_branch.
+
+    Returns an error message string on failure, or None on success.
+    """
+    env = _build_gh_env(token)
+    full_repo = f"{owner}/{repo}"
+
+    # 1. Resolve the SHA of the base branch
+    get_sha_cmd = [
+        "gh",
+        "api",
+        f"repos/{full_repo}/git/refs/heads/{base_branch}",
+        "--jq",
+        ".object.sha",
+    ]
+    logger.info("Resolving SHA of base branch '%s'", base_branch)
+    result = subprocess.run(get_sha_cmd, capture_output=True, text=True, timeout=30, env=env)
+    if result.returncode != 0:
+        return f"Failed to resolve SHA for '{base_branch}': {result.stderr.strip()}"
+
+    sha = result.stdout.strip()
+    if not sha:
+        return f"Empty SHA returned for branch '{base_branch}'"
+
+    logger.info("Base branch '%s' is at SHA %s", base_branch, sha)
+
+    # 2. Create the new branch pointing at that SHA
+    create_cmd = [
+        "gh",
+        "api",
+        f"repos/{full_repo}/git/refs",
+        "--method",
+        "POST",
+        "-f",
+        f"ref=refs/heads/{new_branch}",
+        "-f",
+        f"sha={sha}",
+    ]
+    logger.info("Creating branch '%s' from SHA %s", new_branch, sha)
+    result = subprocess.run(create_cmd, capture_output=True, text=True, timeout=30, env=env)
+    if result.returncode != 0:
+        return f"Failed to create branch '{new_branch}': {result.stderr.strip()}"
+
+    logger.info("Successfully created branch '%s'", new_branch)
+    return None  # success
+
+
 async def github_issue_node(state: ResearchState, config: Config) -> Dict[str, Any]:
     """Create a GitHub issue from the persisted issue.md using the gh CLI."""
     logger.info("Starting GitHub issue creation node")
@@ -47,6 +101,31 @@ async def github_issue_node(state: ResearchState, config: Config) -> Dict[str, A
 
     if github_token:
         logger.info("GitHub token loaded from config")
+
+    # --- Explicit branch creation ---
+    new_branch_name = state.get("new_branch_name", "")
+    base_branch = state.get("branch_name", "") or (config.branch_name or "")
+
+    if new_branch_name and owner and repo:
+        print(f"🌿 Creating branch '{new_branch_name}' from '{base_branch or 'main'}' ...")
+        branch_error = _create_github_branch(
+            owner=owner,
+            repo=repo,
+            base_branch=base_branch or "main",
+            new_branch=new_branch_name,
+            token=github_token,
+        )
+        if branch_error:
+            logger.error("Branch creation failed: %s", branch_error)
+            return {"error": f"Branch creation failed: {branch_error}"}
+        print(f"✅ Branch '{new_branch_name}' created successfully")
+    else:
+        logger.warning(
+            "Skipping branch creation (new_branch_name=%r, owner=%r, repo=%r)",
+            new_branch_name,
+            owner,
+            repo,
+        )
 
     title = f"Research Proposal: {idea}"
 
