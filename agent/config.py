@@ -11,6 +11,7 @@ from typing import Any, Dict, List, Literal, Optional
 
 from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from pythonjsonlogger import jsonlogger
 
 # Try to load dotenv, but don't fail if not available
 try:
@@ -101,7 +102,7 @@ class LoggingConfig(BaseSettings):
     )
 
     level: str = Field(default="INFO", alias="LOG_LEVEL")
-    format: str = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    format: str = "%(asctime)s %(name)s %(levelname)s %(message)s"
     enable_node_logging: bool = Field(default=True, alias="ENABLE_NODE_LOGGING")
     enable_graph_logging: bool = Field(default=True, alias="ENABLE_GRAPH_LOGGING")
     log_to_file: bool = Field(default=False, alias="LOG_TO_FILE")
@@ -777,12 +778,23 @@ class Config(BaseSettings):
         """Setup logging configuration based on the logging config."""
         log_config = self.logging_config
 
-        # Configure the root logger
-        logging.basicConfig(
-            level=getattr(logging, log_config.level.upper()),
-            format=log_config.format,
-            force=True,  # Override any existing configuration
+        # JSON formatter — Cloud Logging interprets 'severity' and 'timestamp' natively
+        json_formatter = jsonlogger.JsonFormatter(
+            fmt=log_config.format,
+            datefmt="%Y-%m-%dT%H:%M:%S",
+            rename_fields={"levelname": "severity", "asctime": "timestamp"},
         )
+
+        root_logger = logging.getLogger()
+        root_logger.setLevel(getattr(logging, log_config.level.upper()))
+
+        # Remove any existing handlers set by basicConfig or imports
+        for h in root_logger.handlers[:]:
+            root_logger.removeHandler(h)
+
+        console_handler = logging.StreamHandler()
+        console_handler.setFormatter(json_formatter)
+        root_logger.addHandler(console_handler)
 
         # If file logging is enabled, add file handler
         if log_config.log_to_file:
@@ -793,10 +805,7 @@ class Config(BaseSettings):
                 maxBytes=log_config.max_log_file_size,
                 backupCount=log_config.backup_count,
             )
-            file_handler.setFormatter(logging.Formatter(log_config.format))
-
-            # Add file handler to root logger
-            root_logger = logging.getLogger()
+            file_handler.setFormatter(json_formatter)
             root_logger.addHandler(file_handler)
 
         # Create loggers for graph and nodes

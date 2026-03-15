@@ -13,5 +13,6 @@ pre-commit>=3.6.0
 pydantic>=2.11.1
 pydantic-settings>=2.7.0
 python-dotenv>=1.0
+python-json-logger>=2.0.7
 pyYAML>=6.0.0
 tenacity>=8.2
